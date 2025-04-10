@@ -6,9 +6,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { AntDesign } from "@expo/vector-icons";
 import { Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+
 
 
 
@@ -16,39 +18,68 @@ import { Text } from 'react-native';
 const _layout = () => {
   const router = useRouter();
 
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('token'); 
+            console.log('Token cleared');
+      router.replace('/login'); 
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+  };
 
   return (
+    <>
     <Tabs screenOptions={{
-      tabBarActiveTintColor: '#99d1f5', headerShown: true, headerStyle:{
-        backgroundColor:"#99d1f5"
+      tabBarActiveTintColor: '#99d1f5', headerShown: true, headerStyle: {
+        backgroundColor: "#99d1f5"
       },
 
-        headerLeft: () =>
+      headerLeft: () => (
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Feather name="arrow-left-circle" size={24} color="black" style={styles.raisedIcon} onPress={() => {
             router.back()
-          }} />,
-          headerRight: () => (
-            <TouchableOpacity style={{ position: "absolute", top: 10, right: 15, marginTop:8}}>
-              <AntDesign name="bells" size={24} color="black" />
-              <View
-                style={{
-                  position: "absolute",
-                  right: -5,
-                  top: -5,
-                  backgroundColor: "red",
-                  borderRadius: 10,
-                  width: 20,
-                  height: 20,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>3</Text>
-              </View>
+          }} />
+          
+        </View>
+      ),
+      headerTitle: () => (
+        <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#333' }}>Remas</Text>
+      ),
+      headerTitleAlign: 'center',
+      headerRight: () => (
+        <View style={{ flex:1, flexDirection: 'row' ,marginRight:20 }}>
+          <View style={{ position: "relative", marginRight: 25 }}>
+            <AntDesign name="bells" size={24} color="black" />
+            <View
+              style={{
+                position: "absolute",
+                right: -5,
+                top: -5,
+                backgroundColor: "red",
+                borderRadius: 10,
+                width: 20,
+                height: 20,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>3</Text>
+            </View>
+          </View> 
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: 100 }}>
+            <TouchableOpacity onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={28} color="#333" />
             </TouchableOpacity>
-          )
+            <TouchableOpacity style={{ position: "absolute", right: 15, marginTop: 8 }} onPress={() => {
+              router.navigate('/messages')
+            }}>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ),    
 
-       
+
 
     }}>
       <Tabs.Screen
@@ -58,14 +89,7 @@ const _layout = () => {
           tabBarIcon: ({ color }) => <FontAwesome size={28} name="home" color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="payment"
-        options={{
-          title: 'payment',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="cash-multiple" size={24} color={color} />
-        }}
-      />
-      
+
       <Tabs.Screen
         name="messages"
         options={{
@@ -88,7 +112,7 @@ const _layout = () => {
         }}
       />
     </Tabs>
-
+</>
   )
 }
 

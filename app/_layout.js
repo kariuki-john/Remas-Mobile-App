@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 
 export default function RootLayout() {
   return (
+    
   <Stack screenOptions={(
     { headerShown: false, animation: "fade_from_bottom" }
   )}>
@@ -37,8 +38,14 @@ export default function RootLayout() {
           presentation: 'modal',
           headerShown:false
         }}
-        
+               
       />
+       <Stack.Screen 
+        name="payments/paymentPage"
+        options={{
+          headerShown:false,
+        }}/>
+         
   </Stack>
   )
 }

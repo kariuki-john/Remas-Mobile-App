@@ -1,64 +1,127 @@
-import { View, Text, Image, ImageBackground, StyleSheet, TouchableOpacity, TextInput } from 'react-native'
-import React from 'react'
-import { Link, useRouter, } from 'expo-router';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  ImageBackground,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { apiPost } from './serviceApi';
 
-const router = useRouter();
 export default function ForgotPassword() {
-  return (
-    
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
 
+  const handleRequestOTP = async () => {
+    if (!email) {
+      Alert.alert('Validation Error', 'Please enter your email');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await apiPost('/forgot-password', { email });
+
+      if (response?.success) {
+        Alert.alert('Success', 'OTP sent to your email');
+        router.push('/otpPage');
+      } else {
+        Alert.alert('Failed', response.message || 'Could not send OTP');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Please enter a valid email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
     <ImageBackground source={require("../assets/images/login.png")} style={styles.image}>
-      <View style={{ width: "100%", alignItems: "center",justifyContent:"center", height: "100%",}}>
+      <View style={styles.container}>
         <Image
           source={require("../assets/images/removedbackground.png")}
-          style={{ width: 100, height: 100, marginBottom:5,backgroundColor:"#eeeeee" }}
+          style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={{ fontSize: 22, fontWeight: "bold", color: "#53A0C1", marginBottom: 10 }}>
-          REMAS
-        </Text>
+        <Text style={styles.title}>REMAS</Text>
 
         <TextInput
-          style={{
-            width: "90%",
-            backgroundColor: "#FFF",
-            padding: 12,
-            borderRadius: 8,
-            marginBottom: 12,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            elevation: 2,
-          }}
+          style={styles.input}
           placeholder="Email"
           placeholderTextColor="#888"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
         />
 
         <TouchableOpacity
-          style={{
-            backgroundColor: "#53A0C1",
-            width: "90%",
-            padding: 12,
-            borderRadius: 8,
-            alignItems: "center",
-          }}
-          onPress={() => { 
-            router.navigate("/otpPage") 
-          }}
-          
+          style={styles.button}
+          onPress={handleRequestOTP}
+          disabled={loading}
         >
-          <Text style={{ color: "white", fontWeight: "bold", fontSize: 16 }}>REQUEST OTP</Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>REQUEST OTP</Text>
+          )}
         </TouchableOpacity>
-
-       
       </View>
     </ImageBackground>
-
-  )
+  );
 }
+
 const styles = StyleSheet.create({
   image: {
     flex: 1,
     resizeMode: 'cover',
-  }
-})
+  },
+  container: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 5,
+    backgroundColor: '#eeeeee',
+    borderRadius: 50,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#53A0C1',
+    marginBottom: 10,
+  },
+  input: {
+    width: '90%',
+    backgroundColor: '#FFF',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    elevation: 2,
+  },
+  button: {
+    backgroundColor: '#53A0C1',
+    width: '90%',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+});
