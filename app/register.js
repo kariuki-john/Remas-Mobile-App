@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { apiPost } from './serviceApi';
+import { apiRegister } from './serviceApi';  // Changed from apiPost to apiRegister
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -22,7 +22,6 @@ export default function RegisterScreen() {
     contactNumber: '',
     idNumber: '',
     email: '',
-    
   });
 
   const [idImageUri, setIdImageUri] = useState(null);
@@ -49,19 +48,23 @@ export default function RegisterScreen() {
     }
   };
 
-
   const handleRegister = async () => {
-    const { firstName, lastName, contactNumber, idNumber, email} = formData;
+    const { firstName, lastName, contactNumber, idNumber, email } = formData;
 
     if (!firstName || !lastName || !contactNumber || !idNumber || !email) {
       Alert.alert("Validation Error", "All fields are required.");
       return;
     }
 
+    if (!idImageUri) {
+      Alert.alert("Validation Error", "Please upload an ID image.");
+      return;
+    }
+
     try {
       const detailsData = new FormData();
       
-      // Fix 1: Correctly format the image file for upload
+      // Format the image file for upload
       const imageNameParts = idImageUri.split('/');
       const imageName = imageNameParts[imageNameParts.length - 1];
       const imageType = imageName.endsWith('.png') ? 'image/png' : 'image/jpeg';
@@ -71,25 +74,21 @@ export default function RegisterScreen() {
         type: imageType,
         name: imageName,
       });
-     
+      
+      // Add form data as a string
       detailsData.append('userDtoString', JSON.stringify(formData));
-      const response = await apiPost('/user/all/register/tenant', detailsData)
+      
+      // Call apiRegister with requiresAuth set to false
+      const response = await apiRegister('/user/all/register/tenant', detailsData, false);
 
       if (response?.success) {
-        setTimeout(() => {
-          router.replace('/otpPage');
-        }, 100);
-      } else if (response?.message && response.message.includes("successful")) {
-        console.log("Success message found, navigating now");
-        Alert.alert("Registration Successful", response?.message );
-        setTimeout(() => {
-          router.replace('/otpPage');
-        }, 100)
-      }
-      else {
-        Alert.alert("Registration Failed", response?.message || "Unknown error");
+        Alert.alert("Success", "Account created successfully!");
+        router.replace('/login');
+      } else {
+        Alert.alert("Registration Failed", response.message || "Something went wrong.");
       }
     } catch (error) {
+      console.error("Registration error:", error);
       Alert.alert("Error", "Could not complete registration.");
     }
   };
@@ -115,7 +114,7 @@ export default function RegisterScreen() {
           style={styles.input}
           placeholder="Last Name"
           placeholderTextColor="#888"
-          value={formData.secondName}
+          value={formData.lastName}
           onChangeText={(text) => handleChange('lastName', text)}
         />
         <TextInput
@@ -123,7 +122,7 @@ export default function RegisterScreen() {
           placeholder="Contacts"
           placeholderTextColor="#888"
           keyboardType="phone-pad"
-          value={formData.contact}
+          value={formData.contactNumber}
           onChangeText={(text) => handleChange('contactNumber', text)}
         />
         <TextInput

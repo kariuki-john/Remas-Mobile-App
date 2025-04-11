@@ -1,8 +1,9 @@
 import { encode } from './encryption';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 
-const BASE_URL = 'http://161.97.69.205:6790/remas/api/v1'; 
+const BASE_URL = 'http://161.97.69.205:6790/remas/api/v1';
 
 
 
@@ -38,10 +39,59 @@ export const login = async (email, password) => {
   }
 };
 
+
+export const apiRegister = async (endpoint, data) => {
+  try {
+    const isFormData = data instanceof FormData;
+    const headers = {};
+    if (isFormData) {
+          } else {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    console.log("Sending POST to:", `${BASE_URL}${endpoint}`);
+    console.log("Headers:", headers);
+    console.log("Data:", isFormData ? 'FormData' : JSON.stringify(data));
+    
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: isFormData ? data : JSON.stringify(data),
+    });
+    
+    const status = response.status;
+    const text = await response.text();
+    
+    console.log("Response Status:", status);
+    console.log("Raw Response Text:", text);
+    
+    if (text) {
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        return { 
+          success: false, 
+          message: `Invalid JSON response (status ${status})`,
+          rawResponse: text
+        };
+      }
+    } else {
+      return { 
+        success: false, 
+        message: `Empty response from server (status ${status})` 
+      };
+    }
+  } catch (error) {
+    console.error('POST error:', error);
+    throw error;
+  }
+};
+
+
 export const apiGet = async (endpoint) => {
   try {
     const token = await AsyncStorage.getItem('token');
-    console.log('Token used in request:', token); 
+    console.log('Token used in request:', token);
 
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'GET',
@@ -52,10 +102,10 @@ export const apiGet = async (endpoint) => {
     });
 
     const text = await response.text();
-    
+
     if (!text) {
       console.warn('Empty response body for', endpoint);
-      return { data: [] }; 
+      return { data: [] };
     }
 
     return JSON.parse(text);
@@ -69,7 +119,7 @@ export const apiGet = async (endpoint) => {
 export const apiPost = async (endpoint, data) => {
   try {
     const token = await AsyncStorage.getItem('token');
-    
+
     const isFormData = data instanceof FormData;
     const headers = {
       Authorization: `Bearer ${token}`,
@@ -79,28 +129,41 @@ export const apiPost = async (endpoint, data) => {
       headers['Content-Type'] = 'application/json';
     }
 
+    console.log("Sending POST to:", `${BASE_URL}${endpoint}`);
+    console.log("Headers:", headers);
+    console.log("Data:", isFormData ? 'FormData' : JSON.stringify(data));
+
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'POST',
       headers,
       body: isFormData ? data : JSON.stringify(data),
     });
 
-    return await response.json();
+    const status = response.status;
+    const text = await response.text();
+
+    console.log("Response Status:", status);
+    console.log("Raw Response Text:", text);
+
+    if (text) {
+      return JSON.parse(text);
+    } else {
+      return { success: false, message: `Empty response from server (status ${status})` };
+    }
   } catch (error) {
     console.error('POST error:', error);
     throw error;
   }
 };
 
+
 export const apiPut = async (endpoint, data) => {
-  try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-    return await response.json();
-  } catch (error) {
-    console.error('PUT error:', error);
-    throw error;
-  }
+  const token = await AsyncStorage.getItem('token');
+  return axios.put(`${BASE_URL}${endpoint}`, data, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
 };
+

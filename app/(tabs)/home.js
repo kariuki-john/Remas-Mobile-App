@@ -124,7 +124,7 @@ const HomeScreen = () => {
                     onPress={() => router.push({
                       pathname: 'payments/payment',
                       params: {
-                        unitId: unit.unitId, // ✅ Pass as number
+                        unitId: unit.unitId, 
                         unitName: unit.unitName,
                         propertyName: unit.propertyName,
                         propertyAddress: unit.propertyAddress,
