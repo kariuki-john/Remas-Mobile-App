@@ -1,30 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, TextInput, FlatList, TouchableOpacity, Modal, ScrollView, Image,
+  View, Text, TextInput, FlatList, TouchableOpacity, Image, RefreshControl,
 } from 'react-native';
-import { Feather, AntDesign } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { apiGet } from '../serviceApi';
 
 const MessagesPage = () => {
   const [conversations, setTenantsConversations] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
   const [suggestedUsers, setSuggestedUsers] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   const router = useRouter();
 
-  const searchSuggestedUsers = async () => {
-    try {
-      const response = await apiGet('/user/all/suggest-user?email=' + searchQuery);
-      console.log('Suggested users:', response.data);
-      setSuggestedUsers(response.data || []);
-
-      
-    } catch (error) {
-      console.error('Error fetching suggested users:', error);
-    }
-  }
+  const totalUnreadMessages = conversations.reduce(
+    (sum, convo) => sum + (convo.unreadMessages || 0),
+    0
+  );
+  
 
   const fetchTenantsConversation = async () => {
     try {
@@ -35,38 +29,63 @@ const MessagesPage = () => {
     }
   };
 
+  const searchSuggestedUsers = async () => {
+    if (!searchQuery.trim()) return;
+    try {
+      const response = await apiGet('/user/all/suggest-user?email=' + searchQuery);
+      const users = response.data || [];
+  
+      const formatted = users.map(user => ({
+        id: user.id,
+        otherPartyName: user.fullName || user.name || 'Unknown',
+        otherPartyEmail: user.email || 'No email',
+                 
+      }));
+  
+      setSuggestedUsers(formatted);
+      setTenantsConversations(formatted);
+    } catch (error) {
+      console.error('Error fetching suggested users:', error);
+    }
+  };
+  
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchTenantsConversation();
+    setRefreshing(false);
+  }, []);
+
   useEffect(() => {
     fetchTenantsConversation();
   }, []);
 
-  const filteredTenantsConversations = conversations.filter(
-    (conversation) =>
-      conversation.otherPartyName &&
-      conversation.otherPartyName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
- 
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      if (searchQuery.trim()) {
+        searchSuggestedUsers();
+      } else {
+        fetchTenantsConversation();
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
+
   const continueConversation = (conversation) => {
     router.push({
       pathname: '/chats/chatsPage',
       params: {
         fullName: conversation.otherPartyName,
         email: conversation.otherPartyEmail,
+        unreadMessages: conversation.unreadMessages,
         conversationId: conversation.id,
       },
     });
   };
 
-  const startConversation = (suggestedUser) => {
-    router.push({
-      pathname: '/chats/chatsPage',
-      params: {
-        fullName: suggestedUser.fullName,
-        email: suggestedUser.email,
-      },
-    });
-  };
+  //start conversation page
 
- //conversations page
   const renderTenantItem = ({ item }) => (
     <TouchableOpacity
       onPress={() => continueConversation(item)}
@@ -94,116 +113,59 @@ const MessagesPage = () => {
         </Text>
         <Text style={{ color: 'gray' }}>{item.otherPartyEmail || 'No email'}</Text>
       </View>
+      {item.unreadMessages > 0 && (
+        <View
+          style={{
+            backgroundColor: 'red',
+            borderRadius: 999,
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            minWidth: 24,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>
+            {item.unreadMessages}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: 'white', padding: 15 }}>
-
-
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: '#fff',
+          borderRadius: 20,
+          paddingHorizontal: 15,
+          height: 45,
+          shadowOpacity: 0.2,
+          elevation: 3,
+          marginBottom: 15,
+        }}
+      >
+        <TextInput
+          placeholder="Search for a tenant..."
+          style={{ flex: 1 }}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSubmitEditing={searchSuggestedUsers}
+        />
+        <Feather name="search" size={20} color="gray" onPress={searchSuggestedUsers} />
+      </View>
 
       <FlatList
         data={conversations}
         keyExtractor={(item, index) => item.otherPartyEmail || `tenant-${index}`}
         renderItem={renderTenantItem}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       />
-
-      <TouchableOpacity
-        onPress={() => setModalVisible(true)}
-        style={{
-          position: 'absolute',
-          bottom: 20,
-          right: 20,
-          backgroundColor: '#99d1f5',
-          borderRadius: 30,
-          width: 60,
-          height: 60,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <AntDesign name="plus" size={30} color="white" />
-      </TouchableOpacity>
-
-      <Modal
-        animationType="slide"
-        transparent
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          justifyContent: 'center',
-          padding: 20
-        }}>
-          <View style={{
-            backgroundColor: 'white',
-            borderRadius: 10,
-            padding: 20,
-            maxHeight: '80%'
-          }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>All Tenants</Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: '#fff',
-                borderRadius: 20,
-                paddingHorizontal: 15,
-                height: 45,
-                shadowOpacity: 0.2,
-                elevation: 3,
-                marginBottom: 15,
-              }}
-            >
-              <TextInput
-                placeholder="Search for a tenant..."
-                style={{ flex: 1 }}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                onSubmitEditing={searchSuggestedUsers}                
-              />
-              <Feather name="search" size={20} color="gray" onPress={()=>{
-                searchSuggestedUsers()
-              }}/>
-            </View>
-            <ScrollView>
-              {suggestedUsers.map((suggestedUser, index) => (
-                <TouchableOpacity
-                  key={suggestedUser.email || `modal-tenant-${index}`}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: 10,
-                    borderBottomWidth: 1,
-                    borderColor: '#ddd',
-                  }}
-                  onPress={() => {
-                    setModalVisible(false);
-                    startConversation(suggestedUser);
-                  }}
-                >
-                  {suggestedUser.profilePic && (
-                    <Image
-                      source={{ uri: suggestedUser.profilePic }}
-                      style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }}
-                    />
-                  )}
-                  <Text>{suggestedUser.fullName || 'Unknown'}</Text> 
-                  <Text>{suggestedUser.email || 'Unknown'}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TouchableOpacity
-              onPress={() => setModalVisible(false)}
-              style={{ marginTop: 10, alignSelf: 'flex-end' }}
-            >
-              <Text style={{ color: '#99d1f5' }}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };

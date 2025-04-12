@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Tabs } from 'expo-router'
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
@@ -9,9 +9,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { AntDesign } from "@expo/vector-icons";
 import { Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-
-
+import { apiGet } from '../serviceApi';
 
 
 
@@ -27,6 +25,26 @@ const _layout = () => {
       console.error('Error during logout:', error);
     }
   };
+
+  const [unreadCount, setUnreadCount] = useState(0);
+
+useEffect(() => {
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await apiGet('/bills-notifications/unread-count');
+      setUnreadCount(response?.count || 0); 
+    } catch (error) {
+      console.error('Failed to fetch unread count:', error);
+    }
+  };
+
+  fetchUnreadCount();
+
+  const interval = setInterval(fetchUnreadCount, 10000); 
+  return () => clearInterval(interval);
+}, []);
+
+  
 
   return (
     <>
@@ -48,25 +66,33 @@ const _layout = () => {
       ),
       headerTitleAlign: 'center',
       headerRight: () => (
-        <View style={{ flex:1, flexDirection: 'row' ,marginRight:20 }}>
-          <View style={{ position: "relative", marginRight: 25 }}>
-            <AntDesign name="bells" size={24} color="black" />
-            <View
-              style={{
-                position: "absolute",
-                right: -5,
-                top: -5,
-                backgroundColor: "red",
-                borderRadius: 10,
-                width: 20,
-                height: 20,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>3</Text>
-            </View>
-          </View> 
+        <View style={{ flex: 1, flexDirection: 'row', marginRight: 20 }}>
+          <TouchableOpacity onPress={() => router.navigate('notifications/notification')}>
+  <View style={{ position: "relative", marginRight: 25 }}>
+    <AntDesign name="bells" size={24} color="black" />
+    {unreadCount > 0 && (
+      <View
+        style={{
+          position: "absolute",
+          right: -5,
+          top: -5,
+          backgroundColor: "red",
+          borderRadius: 10,
+          width: 20,
+          height: 20,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "bold" }}>
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </Text>
+      </View>
+    )}
+  </View>
+</TouchableOpacity>
+
+      
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: 100 }}>
             <TouchableOpacity onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={28} color="#333" />
@@ -77,7 +103,8 @@ const _layout = () => {
             </TouchableOpacity>
           </View>
         </View>
-      ),    
+      )
+        
 
 
 
