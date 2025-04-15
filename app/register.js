@@ -7,11 +7,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { apiRegister } from './serviceApi';  // Changed from apiPost to apiRegister
+import Toast from 'react-native-toast-message';
+import { apiRegister } from './serviceApi';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -34,7 +34,12 @@ export default function RegisterScreen() {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permissionResult.granted) {
-      alert("Permission to access camera roll is required!");
+      Toast.show({
+        type: 'error',
+        position: 'top',
+        text1: 'Permission Required',
+        text2: 'Access to camera roll is required!',
+      });
       return;
     }
 
@@ -52,44 +57,79 @@ export default function RegisterScreen() {
     const { firstName, lastName, contactNumber, idNumber, email } = formData;
 
     if (!firstName || !lastName || !contactNumber || !idNumber || !email) {
-      Alert.alert("Validation Error", "All fields are required.");
+      Toast.show({
+        type: 'error',
+        position: 'top',
+        text1: 'Validation Error',
+        text2: 'All fields are required.',
+      });
       return;
     }
 
     if (!idImageUri) {
-      Alert.alert("Validation Error", "Please upload an ID image.");
+      Toast.show({
+        type: 'error',
+        position: 'top',
+        text1: 'Validation Error',
+        text2: 'Please upload an ID image.',
+      });
       return;
     }
 
     try {
       const detailsData = new FormData();
-      
-      // Format the image file for upload
+
       const imageNameParts = idImageUri.split('/');
       const imageName = imageNameParts[imageNameParts.length - 1];
       const imageType = imageName.endsWith('.png') ? 'image/png' : 'image/jpeg';
-      
+
       detailsData.append('idPicture', {
         uri: idImageUri,
         type: imageType,
         name: imageName,
       });
-      
-      // Add form data as a string
-      detailsData.append('userDtoString', JSON.stringify(formData));
-      
-      // Call apiRegister with requiresAuth set to false
-      const response = await apiRegister('/user/all/register/tenant', detailsData, false);
 
-      if (response?.success) {
-        Alert.alert("Success", "Account created successfully!");
-        router.replace('/login');
+      detailsData.append('userDtoString', JSON.stringify(formData));
+
+      const response = await apiRegister('/user/all/register/tenant', detailsData, false);
+      console.log('Register response:', response);
+
+      if (response?.status === 200) {
+        Toast.show({
+          type: 'success',
+          position: 'top',
+          text1: 'Success',
+          text2: 'Account created successfully!',
+        });
+
+        setFormData({
+          firstName: '',
+          lastName: '',
+          contactNumber: '',
+          idNumber: '',
+          email: '',
+        });
+        setIdImageUri(null);
+
+        setTimeout(() => {
+          router.replace('/otpPage');
+        }, 500);
       } else {
-        Alert.alert("Registration Failed", response.message || "Something went wrong.");
+        Toast.show({
+          type: 'error',
+          position: 'top',
+          text1: 'Registration Failed',
+          text2: response?.message || 'Something went wrong.',
+        });
       }
     } catch (error) {
-      console.error("Registration error:", error);
-      Alert.alert("Error", "Could not complete registration.");
+      console.error('Registration error:', error);
+      Toast.show({
+        type: 'error',
+        position: 'top',
+        text1: 'Error',
+        text2: error?.message || 'Something went wrong.',
+      });
     }
   };
 
@@ -141,7 +181,7 @@ export default function RegisterScreen() {
           value={formData.email}
           onChangeText={(text) => handleChange('email', text)}
         />
-        
+
         <TouchableOpacity onPress={pickImage}>
           <Text style={styles.uploadText}>
             {idImageUri ? "ID Uploaded ✅" : "Upload ID"}
@@ -156,6 +196,8 @@ export default function RegisterScreen() {
           <Text style={styles.footerLink}>Am a member of the community</Text>
         </TouchableOpacity>
       </View>
+
+      <Toast/>
     </ImageBackground>
   );
 }
@@ -173,7 +215,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     width: 80,
-    height: 90,    
+    height: 90,
   },
   title: {
     fontSize: 22,

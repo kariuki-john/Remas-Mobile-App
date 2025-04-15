@@ -113,43 +113,66 @@ const ChatPage = () => {
   };
 
   const renderItem = ({ item }) => {
-    const isMe = item.email === myEmail;
-  
+    const isSender = item.email === myEmail;
+    const isTarget = item.email === email;
+
+    let backgroundColor = '#99d1f5'; 
+    if (isTarget) {
+      backgroundColor = '#eeeeee';
+    }
+    
     return (
       <View
         style={{
-          flexDirection: isMe ? 'row-reverse' : 'row',
+          flexDirection: 'row-reverse', 
           alignItems: 'flex-end',
+          justifyContent: 'flex-end',
           marginVertical: 6,
         }}
       >
+        
         <Image
           source={require('../../assets/images/adaptive-icon.png')}
           style={{
             width: 35,
             height: 35,
             borderRadius: 20,
-            marginHorizontal: 8
+            marginHorizontal: 8,
           }}
         />
+        
         <View
           style={{
-            backgroundColor: isMe ? '#99d1f5' : '#e0e0e0',
+            backgroundColor: backgroundColor,
             padding: 10,
             borderRadius: 10,
             maxWidth: '70%',
           }}
         >
           <Text style={{ fontSize: 14 }}>{item.message}</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 5 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              marginTop: 5,
+            }}
+          >
             <Text style={{ fontSize: 10, color: 'gray' }}>
-              {item.timeStamp ? new Date(item.timeStamp).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              }) : '...'}
+              {item.timeStamp
+                ? new Date(item.timeStamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : '...'}
             </Text>
-            {isMe && (
-              <Text style={{ fontSize: 10, color: 'blue', marginLeft: 4 }}>
+            {isSender && (
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: 'blue',
+                  marginLeft: 4,
+                }}
+              >
                 ✓✓
               </Text>
             )}
@@ -158,7 +181,7 @@ const ChatPage = () => {
       </View>
     );
   };
-  
+ 
 
   return (
     <KeyboardAvoidingView

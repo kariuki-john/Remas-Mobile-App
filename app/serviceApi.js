@@ -6,6 +6,25 @@ import axios from 'axios';
 const BASE_URL = 'http://161.97.69.205:6790/remas/api/v1';
 
 
+export const apiPostPublic = async (endpoint, data = {}) => {
+  try {
+    console.log('(  Sending PUBLIC POST to:', BASE_URL + endpoint);
+    console.log('( Headers:', { 'Content-Type': 'application/json' });
+
+    const response = await axios.post(`${BASE_URL}${endpoint}`, null, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log('(  Response Status:', response.status);
+    return response.data;
+  } catch (error) {
+    console.log(' LOG  Error:', error?.response?.data || error.message);
+    throw error;
+  }
+}
+
 
 export const login = async (email, password) => {
   const encodedPassword = encode(password);
@@ -83,6 +102,41 @@ export const apiRegister = async (endpoint, data) => {
     }
   } catch (error) {
     console.error('POST error:', error);
+    throw error;
+  }
+};
+
+export const otpVerification = async (endpoint, { email, otp, newPassword }) => {
+  const encodedPassword = encode(newPassword); // your custom encode function
+  const formData = new FormData();
+
+  formData.append('email', email);
+  formData.append('otp', otp);
+  formData.append('newPassword', encodedPassword);
+
+  try {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'POST',
+      body: formData,
+      // ❌ DO NOT set Content-Type manually; let fetch set the boundary
+    });
+
+    const status = response.status;
+    const text = await response.text();
+
+    console.log("OTP Verification Response Status:", status);
+    console.log("Raw Response Text:", text);
+
+    if (text) {
+      return JSON.parse(text);
+    } else {
+      return {
+        success: false,
+        message: `Empty response from server (status ${status})`,
+      };
+    }
+  } catch (error) {
+    console.error('OTP verification error:', error);
     throw error;
   }
 };

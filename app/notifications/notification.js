@@ -1,39 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  ActivityIndicator,
-} from 'react-native';
-import { apiGet } from '../serviceApi';
-import { useRouter } from 'expo-router';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { apiPost} from '../serviceApi';
+import eventEmitter from '../eventEmitter';
 
-const Notification = () => {
-  const [selectedType, setSelectedType] = useState('unread');
+const NotificationScreen = () => {
   const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      let endpoint = '';
-      switch (selectedType) {
-        case 'bill':
-          endpoint = '/bills-notifications/display-notifications';
-          break;
-        case 'general':
-          endpoint = '/bills-notifications/all-notifications';
-          break;
-        default:
-          endpoint = '/bills-notifications/all-unread-notifications';
-      }
-
-      const response = await apiGet(endpoint);
-      setNotifications(response || []);
+      const response = await apiPost('/bills-notifications/all-unread-notifications', {
+        pageNumber: 0,
+        pageSize: 50,
+      });
+      
+      console.log('Notifications response:', JSON.stringify(response?.data));
+      const notificationsWithIndex = (response?.data?.content || []).map((notification, index) => ({
+        ...notification,
+        clientId: `notification-${index}` 
+      }));
+      
+      setNotifications(notificationsWithIndex);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('Failed to fetch notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -41,59 +31,85 @@ const Notification = () => {
 
   useEffect(() => {
     fetchNotifications();
-  }, [selectedType]);
+  }, []);
+  const createNotificationKey = (notification) => {
+    return `${notification.message}-${notification.timeStamp}`;
+  };
 
-  const renderNotification = ({ item }) => (
-    <View style={styles.notificationCard}>
-      <Text style={styles.title}>{item.title || 'Notification'}</Text>
-      <Text style={styles.message}>{item.message || item.content || 'No content'}</Text>
-      <Text style={styles.date}>
-        {new Date(item.date || item.createdAt).toLocaleString()}
-      </Text>
-    </View>
-  );
+  const markAsRead = async (notification) => {
+    const notificationKey = createNotificationKey(notification);
+    const identifier = notification.refId;  // Use refId here
+  
+    // Check if identifier is invalid
+    if (!identifier || identifier <= 0) {
+      console.log('Full notification object:', notification);
+      console.warn('Invalid refId. Cannot mark as read.');
+      return;
+    }
+  
+    try {
+      console.log(`Marking notification as read with refId: ${identifier}`);
+      await apiPost(`/bills-notifications/notification/read/${identifier}`);
+      console.log('Full notification object:', notification);
+  
+      // Remove the notification from the state (if needed)
+      setNotifications(prevNotifications => 
+        prevNotifications.filter(item => createNotificationKey(item) !== notificationKey)
+      );
+  
+      // Emit event to update the unread badge
+      eventEmitter.emit('updateUnreadBadge');
+      console.log('Successfully marked notification as read');
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+      Alert.alert('Error', 'Failed to mark notification as read');
+    }
+  };
 
-  const router = useRouter();
+  const renderNotificationItem = ({ item }) => {
+    return (
+      <View style={styles.notificationItem}>
+        <View style={styles.notificationContent}>
+          <Text style={styles.notificationTitle}>{item.theme || 'Notification'}</Text>
+          <Text style={styles.notificationBody}>{item.message || 'No message'}</Text>
+          <Text style={styles.notificationTime}>
+            {item.timeStamp || 'Unknown time'}
+          </Text>
+          <Text style={styles.notificationSender}>
+            From: {item.senderEmail || 'Unknown sender'}
+          </Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.markReadButton}
+          onPress={() => {
+            console.log('Mark as read pressed for notification with refId:', item.refId);
+            markAsRead(item);
+          }}
+        >
+          <Text style={styles.markReadText}>Mark as read</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+  const keyExtractor = (item) => item.clientId || createNotificationKey(item);
 
   return (
     <View style={styles.container}>
-      {/* Toggle buttons */}
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity
-          style={[styles.toggleButton, selectedType === 'unread' && styles.activeToggle]}
-          onPress={() => setSelectedType('unread')}
-        >
-          <Text style={styles.toggleText}>Unread</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toggleButton, selectedType === 'bill' && styles.activeToggle]}
-          onPress={() => setSelectedType('bill')}
-        >
-          <Text style={styles.toggleText}>Bill</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toggleButton, selectedType === 'general' && styles.activeToggle]}
-          onPress={() => setSelectedType('general')}
-        >
-          <Text style={styles.toggleText}>General</Text>
-        </TouchableOpacity>
-      </View>
-
+           
       {loading ? (
-        <ActivityIndicator size="large" color="#99d1f5" style={{ marginTop: 20 }} />
+        <View style={styles.centered}>
+          <Text>Loading notifications...</Text>
+        </View>
+      ) : notifications.length === 0 ? (
+        <View style={styles.centered}>
+          <Text>No new notifications</Text>
+        </View>
       ) : (
         <FlatList
           data={notifications}
-          keyExtractor={(item, index) => index.toString()}
-          renderItem={renderNotification}
-          ListEmptyComponent={
-            <Text style={{ textAlign: 'center', marginTop: 20 }}>
-              No notifications to show.
-            </Text>
-          }
-          contentContainerStyle={{ paddingBottom: 100 }}
+          keyExtractor={keyExtractor}
+          renderItem={renderNotificationItem}
+          contentContainerStyle={styles.listContainer}
         />
       )}
     </View>
@@ -103,56 +119,81 @@ const Notification = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#f8f8f8',
   },
-  toggleContainer: {
+  header: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 16,
-    gap: 10,
-    flexWrap: 'wrap',
-  },
-  toggleButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 20,
-  },
-  activeToggle: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
     backgroundColor: '#99d1f5',
   },
-  toggleText: {
-    fontSize: 16,
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#333',
   },
-  notificationCard: {
+  markAllReadButton: {
     backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  markAllReadText: {
+    color: '#333',
+    fontWeight: '500',
+  },
+  listContainer: {
+    padding: 16,
+  },
+  notificationItem: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     elevation: 2,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-    color: '#333',
+  notificationContent: {
+    marginBottom: 10,
   },
-  message: {
+  notificationTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  notificationBody: {
     fontSize: 14,
     color: '#555',
     marginBottom: 6,
   },
-  date: {
+  notificationTime: {
     fontSize: 12,
-    color: '#999',
-    textAlign: 'right',
+    color: '#888',
+    marginBottom: 4,
+  },
+  notificationSender: {
+    fontSize: 12,
+    color: '#888',
+  },
+  markReadButton: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  markReadText: {
+    color: '#666',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
-export default Notification;
+export default NotificationScreen;

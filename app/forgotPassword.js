@@ -8,34 +8,62 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { apiPost } from './serviceApi';
+import Toast from 'react-native-toast-message';
+import { apiPostPublic } from './serviceApi';
 
 export default function ForgotPassword() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const showToast = (type, text1, text2) => {
+    Toast.show({
+      type,
+      text1,
+      text2,
+      position: 'top',
+      visibilityTime: 3000,
+    });
+  };
+
   const handleRequestOTP = async () => {
     if (!email) {
-      Alert.alert('Validation Error', 'Please enter your email');
+      showToast('error', 'Validation Error', 'Please enter your email');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      showToast('error', 'Invalid Email', 'Please enter a valid email');
       return;
     }
 
     try {
       setLoading(true);
-      const response = await apiPost('/forgot-password', { email });
+      const response = await apiPostPublic(
+        `/user/all/forgot-password?email=${encodeURIComponent(email)}`,
+        {}
+      );
 
-      if (response?.success) {
-        Alert.alert('Success', 'OTP sent to your email');
-        router.push('/otpPage');
+      if (response?.status === 200) {
+        showToast('success', 'OTP Sent', 'Check your email for the OTP.');
+
+        setTimeout(() => {
+          router.push({
+            pathname: '/otpPage',
+            params: {
+              forgotPassword: 'true',
+              email: email, // send email along for prefill
+            },
+          });
+        }, 1000);
       } else {
-        Alert.alert('Failed', response.message || 'Could not send OTP');
+        showToast('error', 'Failed', response?.message || 'Could not request OTP');
       }
     } catch (error) {
-      Alert.alert('Error', 'Please enter a valid email');
+      showToast('error', 'Network Error', 'Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -73,6 +101,7 @@ export default function ForgotPassword() {
           )}
         </TouchableOpacity>
       </View>
+      <Toast />
     </ImageBackground>
   );
 }
