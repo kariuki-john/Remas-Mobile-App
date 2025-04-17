@@ -10,6 +10,7 @@ import Toast from 'react-native-toast-message';
 import { apiGet, apiPost } from '../serviceApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import jwtDecode from 'jwt-decode';
+import { io } from 'socket.io-client';
 
 const ChatPage = () => {
   const [messages, setMessages] = useState([]);
@@ -18,10 +19,15 @@ const ChatPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [myEmail, setMyEmail] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
   const flatListRef = useRef(null);
+  const socketRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
   const router = useRouter();
   const { email, fullName, conversationId } = useLocalSearchParams();
 
+  // Get logged-in user's email
   useEffect(() => {
     const getMyEmail = async () => {
       const token = await AsyncStorage.getItem('token');
@@ -33,15 +39,34 @@ const ChatPage = () => {
     getMyEmail();
   }, []);
 
+  // Socket setup
   useEffect(() => {
-    if (!email) {
-      Toast.show({
-        type: 'error',
-        text1: 'Missing recipient email',
-        text2: 'Please return to contacts and try again'
-      });
-    }
-  }, [email]);
+    if (!myEmail || !conversationId) return;
+
+    const socket = io('http://remas-ke.co.ke:5050', {
+      transports: ['websocket'],
+      query: { email: myEmail },
+    });
+    socketRef.current = socket;
+
+    socket.emit('joinRoom', { conversationId });
+
+    socket.on('newMessage', (message) => {
+      setMessages(prev => [...prev, message]);
+    });
+
+    socket.on('userTyping', ({ from }) => {
+      if (from !== myEmail) setOtherUserTyping(true);
+    });
+
+    socket.on('userStopTyping', ({ from }) => {
+      if (from !== myEmail) setOtherUserTyping(false);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [myEmail, conversationId]);
 
   const fetchMessages = async () => {
     try {
@@ -64,11 +89,6 @@ const ChatPage = () => {
     }
   };
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchMessages();
-  }, []);
-
   useEffect(() => {
     fetchMessages();
   }, [conversationId]);
@@ -81,6 +101,32 @@ const ChatPage = () => {
     }
   }, [messages]);
 
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchMessages();
+  }, []);
+
+  const handleTyping = (text) => {
+    setNewMessage(text);
+    setIsTyping(text.length > 0);
+
+    if (socketRef.current) {
+      socketRef.current.emit('userTyping', {
+        conversationId,
+        from: myEmail,
+      });
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+      typingTimeoutRef.current = setTimeout(() => {
+        socketRef.current.emit('userStopTyping', {
+          conversationId,
+          from: myEmail,
+        });
+      }, 1000);
+    }
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
     try {
@@ -89,15 +135,24 @@ const ChatPage = () => {
         message: newMessage,
         targetUserEmail: email,
       };
+
       const res = await apiPost('/messages/send', payload);
       if (res.status === 200) {
         setNewMessage('');
-        fetchMessages();
+        setIsTyping(false);
+
+        if (socketRef.current) {
+          socketRef.current.emit('sendMessage', {
+            ...res.data,
+            conversationId,
+          });
+        }
+
       } else {
         Toast.show({
           type: 'error',
           text1: 'Failed to send message',
-          text2: res.message || 'Server error'
+          text2: res.message || 'Server error',
         });
       }
     } catch (err) {
@@ -105,7 +160,7 @@ const ChatPage = () => {
       Toast.show({
         type: 'error',
         text1: 'Error sending message',
-        text2: err.message || 'Unknown error'
+        text2: err.message || 'Unknown error',
       });
     } finally {
       setLoading(false);
@@ -114,23 +169,16 @@ const ChatPage = () => {
 
   const renderItem = ({ item }) => {
     const isSender = item.email === myEmail;
-    const isTarget = item.email === email;
+    const backgroundColor = isSender ? '#99d1f5' : '#eeeeee';
 
-    let backgroundColor = '#99d1f5'; 
-    if (isTarget) {
-      backgroundColor = '#eeeeee';
-    }
-    
     return (
       <View
         style={{
-          flexDirection: 'row-reverse', 
+          flexDirection: isSender ? 'row-reverse' : 'row',
           alignItems: 'flex-end',
-          justifyContent: 'flex-end',
           marginVertical: 6,
         }}
       >
-        
         <Image
           source={require('../../assets/images/adaptive-icon.png')}
           style={{
@@ -140,10 +188,9 @@ const ChatPage = () => {
             marginHorizontal: 8,
           }}
         />
-        
         <View
           style={{
-            backgroundColor: backgroundColor,
+            backgroundColor,
             padding: 10,
             borderRadius: 10,
             maxWidth: '70%',
@@ -166,13 +213,7 @@ const ChatPage = () => {
                 : '...'}
             </Text>
             {isSender && (
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: 'blue',
-                  marginLeft: 4,
-                }}
-              >
+              <Text style={{ fontSize: 10, color: 'blue', marginLeft: 4 }}>
                 ✓✓
               </Text>
             )}
@@ -181,7 +222,6 @@ const ChatPage = () => {
       </View>
     );
   };
- 
 
   return (
     <KeyboardAvoidingView
@@ -205,9 +245,14 @@ const ChatPage = () => {
           source={require('../../assets/images/adaptive-icon.png')}
           style={{ width: 50, height: 50, borderRadius: 20, marginLeft: 10 }}
         />
-        <Text style={{ marginLeft: 10, fontSize: 16, fontWeight: 'bold' }}>
-          {fullName || 'Chat'}
-        </Text>
+        <View style={{ marginLeft: 10 }}>
+          <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
+            {fullName || 'Chat'}
+          </Text>
+          {otherUserTyping && (
+            <Text style={{ fontSize: 12, color: 'gray' }}>typing...</Text>
+          )}
+        </View>
       </View>
 
       {/* Message List */}
@@ -251,10 +296,7 @@ const ChatPage = () => {
           }}
           placeholder="Message"
           value={newMessage}
-          onChangeText={text => {
-            setNewMessage(text);
-            setIsTyping(text.length > 0);
-          }}
+          onChangeText={handleTyping}
         />
         <TouchableOpacity
           onPress={sendMessage}

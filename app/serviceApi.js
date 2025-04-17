@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 
-const BASE_URL = 'http://161.97.69.205:6790/remas/api/v1';
+const BASE_URL = 'https://www.remas-ke.co.ke/remas/api/v1';
 
 
 export const apiPostPublic = async (endpoint, data = {}) => {

@@ -15,7 +15,11 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.remas.co.ke"
     },
     "web": {
       "bundler": "metro",
@@ -24,15 +28,25 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font",[
-        "expo-image-picker",{
-          "photosPermission":"Select and upload images.",
-          "cameraPermission":"Allow $(PRODUCT_NAME) to access your camera."
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Select and upload images.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera."
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "d9a742ba-06e6-45b9-be4f-b97ea9c8b5d5"
+      }
     }
   }
 }
