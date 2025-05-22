@@ -1,27 +1,50 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Tabs, useNavigationContainerRef } from 'expo-router';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import Feather from '@expo/vector-icons/Feather';
-import { useRouter, useFocusEffect } from 'expo-router';
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { Tabs, useRouter } from 'expo-router';
 import {
-  StyleSheet,
-  TouchableOpacity,
   View,
   Text,
+  TouchableOpacity,
+  StyleSheet,
   Modal,
   Pressable,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AntDesign } from '@expo/vector-icons';
+import { Feather, Ionicons, AntDesign } from '@expo/vector-icons';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { apiPost } from '../serviceApi';
 import eventEmitter from '../eventEmitter';
 
-const _layout = () => {
+// Theme context setup in same file
+const ThemeContext = createContext();
+const useTheme = () => useContext(ThemeContext);
+
+const ThemeProvider = ({ children }) => {
+  const [theme, setTheme] = useState('light');
+
+  useEffect(() => {
+    AsyncStorage.getItem('theme').then(saved => {
+      if (saved) setTheme(saved);
+    });
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem('theme', theme);
+  }, [theme]);
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+
+const LayoutContent = () => {
   const router = useRouter();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { theme, setTheme } = useTheme();
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const isDark = theme === 'dark';
 
   const fetchUnreadCount = async () => {
     try {
@@ -29,8 +52,7 @@ const _layout = () => {
         pageNumber: 0,
         pageSize: 50,
       });
-      const count = response?.data?.content?.length ?? 0;
-      setUnreadCount(count);
+      setUnreadCount(response?.data?.content?.length ?? 0);
     } catch (error) {
       console.error('Failed to fetch unread count:', error);
     }
@@ -41,69 +63,47 @@ const _layout = () => {
     const interval = setInterval(fetchUnreadCount, 10000);
     const listener = () => fetchUnreadCount();
     eventEmitter.on('updateUnreadBadge', listener);
-  
+
     return () => {
       clearInterval(interval);
       eventEmitter.removeListener('updateUnreadBadge', listener);
     };
   }, []);
-  
-  useFocusEffect(
-    useCallback(() => {
-      fetchUnreadCount();
-    }, [])
-  );
+
+ 
 
   const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem('token');
-      setLogoutVisible(false);
-      router.replace('/login');
-    } catch (error) {
-      console.error('Error during logout:', error);
-    }
+    await AsyncStorage.removeItem('token');
+    setLogoutVisible(false);
+    router.replace('/login');
   };
 
   return (
     <>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: '#99d1f5',
-          headerShown: true,
           headerStyle: {
-            backgroundColor: '#99d1f5',
+            backgroundColor: isDark ? '#222' : '#99d1f5',
           },
-          headerLeft: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Feather
-                name="arrow-left-circle"
-                size={24}
-                color="black"
-                style={styles.raisedIcon}
-                onPress={() => router.back()}
-              />
-            </View>
-          ),
-          headerTitle: () => (
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#333' }}>Remas</Text>
-          ),
-          headerTitleAlign: 'center',
+          headerTintColor: isDark ? '#fff' : '#000',
+          tabBarStyle: {
+            backgroundColor: isDark ? '#121212' : '#fff',
+          },
+          tabBarActiveTintColor: '#99d1f5',
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 20 }}>
               <TouchableOpacity onPress={() => router.navigate('notifications/notification')}>
-                <View style={{ position: 'relative', marginRight: 25 }}>
-                  <AntDesign name="bells" size={24} color="black" />
+                <View style={{ position: 'relative', marginRight: 20 }}>
+                  <AntDesign name="bells" size={24} color={isDark ? '#fff' : 'black'} />
                   {unreadCount > 0 && (
                     <View style={styles.notificationBadge}>
-                      <Text style={styles.badgeText}>
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                      </Text>
+                      <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
                     </View>
                   )}
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setLogoutVisible(true)}>
-                <Ionicons name="log-out-outline" size={28} color="#333" />
+              <TouchableOpacity onPress={() => setLogoutVisible(true)} style={{ alignItems: 'center',justifyContent: 'center' }}>
+                <Ionicons name="log-out-outline" size={24} color={isDark ? '#fff' : '#333'} />
               </TouchableOpacity>
             </View>
           ),
@@ -113,7 +113,7 @@ const _layout = () => {
           name="home"
           options={{
             title: 'Home',
-            tabBarIcon: ({ color }) => <FontAwesome size={28} name="home" color={color} />,
+            tabBarIcon: ({ color }) => <FontAwesome name="home" size={24} color={color} />,
           }}
         />
         <Tabs.Screen
@@ -133,15 +133,15 @@ const _layout = () => {
           }}
         />
         <Tabs.Screen
-          name="settings"
+          name="maintenance"
           options={{
-            title: 'Settings',
+            title: 'Maintenance',
             tabBarIcon: ({ color }) => <Feather name="tool" size={24} color={color} />,
           }}
         />
       </Tabs>
 
-      {/* Logout Confirmation Modal */}
+      {/* Logout Modal */}
       <Modal transparent visible={logoutVisible} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -163,13 +163,6 @@ const _layout = () => {
 };
 
 const styles = StyleSheet.create({
-  raisedIcon: {
-    shadowColor: 'white',
-    shadowOffset: { width: 5, height: 2 },
-    shadowOpacity: 1.5,
-    shadowRadius: 13,
-    padding: 10,
-  },
   notificationBadge: {
     position: 'absolute',
     right: -5,
@@ -236,4 +229,10 @@ const styles = StyleSheet.create({
   },
 });
 
-export default _layout;
+export default function LayoutWrapper() {
+  return (
+    <ThemeProvider>
+      <LayoutContent />
+    </ThemeProvider>
+  );
+}

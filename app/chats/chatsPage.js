@@ -25,9 +25,8 @@ const ChatPage = () => {
   const typingTimeoutRef = useRef(null);
 
   const router = useRouter();
-  const { email, fullName, conversationId } = useLocalSearchParams();
+  const { receiveremail, fullName, conversationId ,email} = useLocalSearchParams();
 
-  // Get logged-in user's email
   useEffect(() => {
     const getMyEmail = async () => {
       const token = await AsyncStorage.getItem('token');
@@ -41,40 +40,43 @@ const ChatPage = () => {
 
   // Socket setup
   useEffect(() => {
-    if (!myEmail || !conversationId) return;
+    if (!receiveremail || !conversationId) return;
 
     const socket = io('http://remas-ke.co.ke:5050', {
       transports: ['websocket'],
-      query: { email: myEmail },
+      query: { username: receiveremail },
     });
+
     socketRef.current = socket;
 
     socket.emit('joinRoom', { conversationId });
 
     socket.on('newMessage', (message) => {
-      setMessages(prev => [...prev, message]);
+      if (message.conversationId === conversationId) {
+        setMessages(prev => [...prev, message]);
+      }
     });
 
     socket.on('userTyping', ({ from }) => {
-      if (from !== myEmail) setOtherUserTyping(true);
+      if (from !== receiveremail) setOtherUserTyping(true);
     });
 
     socket.on('userStopTyping', ({ from }) => {
-      if (from !== myEmail) setOtherUserTyping(false);
+      if (from !== receiveremail) setOtherUserTyping(false);
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [myEmail, conversationId]);
+  }, [receiveremail, conversationId]);
 
   const fetchMessages = async () => {
     try {
       setLoading(true);
       const res = await apiGet(`/messages/conversation-messages/${conversationId}`);
       if (res?.data && Array.isArray(res.data)) {
-        const sortedMessages = [...res.data].sort((a, b) =>
-          new Date(a.timeStamp) - new Date(b.timeStamp)
+        const sortedMessages = res.data.sort(
+          (a, b) => new Date(a.timeStamp) - new Date(b.timeStamp)
         );
         setMessages(sortedMessages);
       } else {
@@ -113,7 +115,7 @@ const ChatPage = () => {
     if (socketRef.current) {
       socketRef.current.emit('userTyping', {
         conversationId,
-        from: myEmail,
+        from: email,
       });
 
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -121,7 +123,7 @@ const ChatPage = () => {
       typingTimeoutRef.current = setTimeout(() => {
         socketRef.current.emit('userStopTyping', {
           conversationId,
-          from: myEmail,
+          from: email,
         });
       }, 1000);
     }
@@ -129,6 +131,7 @@ const ChatPage = () => {
 
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
+
     try {
       setLoading(true);
       const payload = {
@@ -138,15 +141,24 @@ const ChatPage = () => {
 
       const res = await apiPost('/messages/send', payload);
       if (res.status === 200) {
+        const messageData = {
+          ...res.data,
+          conversationId,
+        };
+
+        // Update UI instantly
+        setMessages(prev => [...prev, messageData]);
         setNewMessage('');
         setIsTyping(false);
 
+        // Emit via socket
         if (socketRef.current) {
-          socketRef.current.emit('sendMessage', {
-            ...res.data,
-            conversationId,
-          });
+          socketRef.current.emit('sendMessage', messageData);
         }
+
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
 
       } else {
         Toast.show({
@@ -168,7 +180,7 @@ const ChatPage = () => {
   };
 
   const renderItem = ({ item }) => {
-    const isSender = item.email === myEmail;
+    const isSender = item.receiveremail === receiveremail;
     const backgroundColor = isSender ? '#99d1f5' : '#eeeeee';
 
     return (
@@ -261,7 +273,11 @@ const ChatPage = () => {
         data={messages}
         keyExtractor={(item, index) => index.toString()}
         renderItem={renderItem}
-        contentContainerStyle={{ padding: 10, flexGrow: 1, justifyContent: 'flex-end' }}
+        contentContainerStyle={{
+          padding: 10,
+          flexGrow: 1,
+          justifyContent: 'flex-end'
+        }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

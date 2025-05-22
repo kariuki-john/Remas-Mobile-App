@@ -14,6 +14,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { apiGet } from '../serviceApi';
+import { useTheme } from '../ThemeContext';
 
 const HomeScreen = () => {
   const [roomDetails, setRoomDetails] = useState([]);
@@ -27,6 +28,8 @@ const HomeScreen = () => {
   const [pageNumber, setPageNumber] = useState(0);
   const pageSize = 10;
   const [hasMore, setHasMore] = useState(true);
+
+  const { theme } = useTheme();
 
   const fetchData = async (reset = false) => {
     try {
@@ -103,6 +106,7 @@ const HomeScreen = () => {
   }
 
   return (
+    
     <View style={styles.container}>
       {loading ? (
         <ActivityIndicator size="large" color="#1976D2" />

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import LoginScreen from './login';
 import SplashScreen from './splashScreenView';
 import Toast from 'react-native-toast-message';
-import 'react-native-url-polyfill/auto';
 
 
 export default function Index() {

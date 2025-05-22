@@ -18,7 +18,6 @@ const MessagesPage = () => {
     (sum, convo) => sum + (convo.unreadMessages || 0),
     0
   );
-  
 
   const fetchTenantsConversation = async () => {
     try {
@@ -34,21 +33,19 @@ const MessagesPage = () => {
     try {
       const response = await apiGet('/user/all/suggest-user?email=' + searchQuery);
       const users = response.data || [];
-  
+
       const formatted = users.map(user => ({
         id: user.id,
         otherPartyName: user.fullName || user.name || 'Unknown',
         otherPartyEmail: user.email || 'No email',
-                 
       }));
-  
+
       setSuggestedUsers(formatted);
       setTenantsConversations(formatted);
     } catch (error) {
       console.error('Error fetching suggested users:', error);
     }
   };
-  
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -58,6 +55,13 @@ const MessagesPage = () => {
 
   useEffect(() => {
     fetchTenantsConversation();
+
+    // Polling every 5 seconds to fetch new messages
+    const intervalId = setInterval(() => {
+      fetchTenantsConversation();
+    }, 5000); // fetch new messages every 5 seconds
+
+    return () => clearInterval(intervalId); // Clean up interval on component unmount
   }, []);
 
   useEffect(() => {
@@ -83,8 +87,6 @@ const MessagesPage = () => {
       },
     });
   };
-
-  //start conversation page
 
   const renderTenantItem = ({ item }) => (
     <TouchableOpacity
