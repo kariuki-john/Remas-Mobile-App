@@ -46,6 +46,8 @@ export const login = async (email, password) => {
 
     if (res.ok && data?.data?.token) {
       await AsyncStorage.setItem('token', data.data.token);
+      await AsyncStorage.setItem('email', data.data.email);
+      await AsyncStorage.setItem('name', data.data.name);
       console.log('Token stored:', data.data.token);
     } else {
       console.warn('Login failed or token missing');
@@ -145,9 +147,7 @@ export const otpVerification = async (endpoint, { email, otp, newPassword }) => 
 export const apiGet = async (endpoint) => {
   try {
     const token = await AsyncStorage.getItem('token');
-    console.log('Token used in request:', token);
-
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+       const response = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -183,11 +183,7 @@ export const apiPost = async (endpoint, data) => {
       headers['Content-Type'] = 'application/json';
     }
 
-    console.log("Sending POST to:", `${BASE_URL}${endpoint}`);
-    console.log("Headers:", headers);
-    console.log("Data:", isFormData ? 'FormData' : JSON.stringify(data));
-
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+   const response = await fetch(`${BASE_URL}${endpoint}`, {
       method: 'POST',
       headers,
       body: isFormData ? data : JSON.stringify(data),
@@ -195,9 +191,6 @@ export const apiPost = async (endpoint, data) => {
 
     const status = response.status;
     const text = await response.text();
-
-    console.log("Response Status:", status);
-    console.log("Raw Response Text:", text);
 
     if (text) {
       return JSON.parse(text);
@@ -221,3 +214,29 @@ export const apiPut = async (endpoint, data) => {
   });
 };
 
+export const apiPostData = async (params, endpoint) => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    const status = response.status;
+    const text = await response.text();
+
+    if (text) {
+      return JSON.parse(text);
+    } else {
+      return { success: false, message: `Empty response from server (status ${status})` };
+    }
+
+  } catch (error) {
+    console.error('POST error:', error);
+    throw error;
+  }
+};

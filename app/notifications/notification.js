@@ -38,19 +38,18 @@ const NotificationScreen = () => {
 
   const markAsRead = async (notification) => {
     const notificationKey = createNotificationKey(notification);
-    const identifier = notification.refId;  // Use refId here
+    const identifier = notification.refId;  
   
     // Check if identifier is invalid
     if (!identifier || identifier <= 0) {
-      console.log('Full notification object:', notification);
-      console.warn('Invalid refId. Cannot mark as read.');
+      
       return;
     }
   
     try {
-      console.log(`Marking notification as read with refId: ${identifier}`);
+     
       await apiPost(`/bills-notifications/notification/read/${identifier}`);
-      console.log('Full notification object:', notification);
+     
   
       // Remove the notification from the state (if needed)
       setNotifications(prevNotifications => 
@@ -82,7 +81,6 @@ const NotificationScreen = () => {
         <TouchableOpacity 
           style={styles.markReadButton}
           onPress={() => {
-            console.log('Mark as read pressed for notification with refId:', item.refId);
             markAsRead(item);
           }}
         >
@@ -120,6 +118,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
+    marginTop: 60,
+    padding: 16,
   },
   header: {
     flexDirection: 'row',

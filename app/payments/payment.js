@@ -8,6 +8,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { Picker } from '@react-native-picker/picker';
 import { apiPost, apiGet } from '../serviceApi';
+import { ImageBackground } from 'react-native';
+
 
 export default function PaymentPage() {
   const [paymentOption, setPaymentOption] = useState('mpesa');
@@ -134,23 +136,28 @@ export default function PaymentPage() {
       <Feather name="arrow-left-circle" size={28} color="black" style={styles.raisedIcon} onPress={() => router.back()} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.roomCard}>
-          <Text style={styles.unitTitle}>{unitName}</Text>
-          <Text style={styles.propertyInfo}>{propertyName}, {propertyAddress}</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Payment Term:</Text>
-            <Text style={styles.value}>{paymentMonthStart} - {paymentMonthEnd}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Total:</Text>
-            <Text style={[styles.value, styles.money]}>Kes {requiredAmount}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Paid:</Text>
-            <Text style={[styles.value, styles.moneyGreen]}>Kes {amountPaid}</Text>
-          </View>
-        </View>
-      </ScrollView>
+  <ImageBackground
+    source={require('../../assets/images/card.jpg')}
+    style={styles.roomCard}
+    imageStyle={{ borderRadius: 12 }}
+  >
+    <Text style={styles.unitTitle}>{unitName}</Text>
+    <Text style={styles.propertyInfo}>{propertyName}, {propertyAddress}</Text>
+    <View style={styles.row}>
+      <Text style={styles.label}>Payment Term:</Text>
+      <Text style={styles.value}>{paymentMonthStart} - {paymentMonthEnd}</Text>
+    </View>
+    <View style={styles.row}>
+      <Text style={styles.label}>Total:</Text>
+      <Text style={[styles.value, styles.money]}>Kes {requiredAmount}</Text>
+    </View>
+    <View style={styles.row}>
+      <Text style={styles.label}>Paid:</Text>
+      <Text style={[styles.value, styles.moneyGreen]}>Kes {amountPaid}</Text>
+    </View>
+  </ImageBackground>
+</ScrollView>
+
 
       <Text style={styles.paymentTitle}>Payment options (Use one)</Text>
       <View style={styles.radioGroup}>
@@ -258,31 +265,42 @@ const styles = StyleSheet.create({
     shadowRadius: 13,
     padding: 5,
   },
-  roomCard: {
-    width: 320,
-    backgroundColor: 'white',
-    padding: 16,
-    height: 200,
-    borderRadius: 12,
-    marginBottom: 20,
-    marginRight: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  unitTitle: {
-    fontSize: 22,
+roomCard: {
+  width: 320,
+  height: 200,
+  borderRadius: 12,
+  marginBottom: 20,
+  marginRight: 10,
+  overflow: 'hidden',
+  justifyContent: 'center',
+  padding: 16,
+  
+},
+unitTitle: {
+  fontSize: 22,
+  fontWeight: 'bold',
+  marginBottom: 6,
+  fontSize: 22,
+    fontStyle: 'italic',
     fontWeight: 'bold',
-    marginBottom: 6,
-    color: '#1565C0',
-  },
-  propertyInfo: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 10,
-  },
+    color: '#FFD700',
+  textShadowColor: 'rgba(0, 0, 0, 0.6)',
+  textShadowOffset: { width: 1, height: 1 },
+  textShadowRadius: 2,
+},
+propertyInfo: {
+  fontSize: 14,
+  color: '#EEE',
+  marginBottom: 10,
+  textShadowColor: 'rgba(0, 0, 0, 0.6)',
+  textShadowOffset: { width: 1, height: 1 },
+  textShadowRadius: 2,
+  fontSize: 22,
+    fontStyle: 'italic',
+    fontWeight: 'bold',
+    color: '#FFD700',
+},
+
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -292,17 +310,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: '#444',
+    fontSize: 15,
+    fontStyle: 'italic',
+    
+    color: '#FFD700',
   },
   value: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#222',
+    fontSize: 15,
+    fontStyle: 'italic',
+    fontWeight: 'small',
+    color: '#FFD700',
   },
   money: {
-    color: '#E65100',
+    color: '#FFD700',
   },
   moneyGreen: {
-    color: '#2E7D32',
+    color: '#FFD700',
   },
   paymentTitle: {
     fontSize: 16,

@@ -56,12 +56,6 @@ const MessagesPage = () => {
   useEffect(() => {
     fetchTenantsConversation();
 
-    // Polling every 5 seconds to fetch new messages
-    const intervalId = setInterval(() => {
-      fetchTenantsConversation();
-    }, 5000); // fetch new messages every 5 seconds
-
-    return () => clearInterval(intervalId); // Clean up interval on component unmount
   }, []);
 
   useEffect(() => {
@@ -136,12 +130,12 @@ const MessagesPage = () => {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'white', padding: 15 }}>
+    <View style={{ flex: 1, backgroundColor: '#f8f8f8', padding: 15, marginTop: 60}}>
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          backgroundColor: '#fff',
+          backgroundColor: '#f8f8f8',
           borderRadius: 20,
           paddingHorizontal: 15,
           height: 45,

@@ -111,7 +111,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: '#f9f9f9', padding: 20 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: '#f9f9f9', padding: 20 , marginTop:60}}>
       <View style={{
         backgroundColor: 'white',
         padding: 20,
