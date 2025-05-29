@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function RootLayout() {
-  const { fullName, Email } = useLocalSearchParams();
+  const { fullName, email } = useLocalSearchParams();
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const router = useRouter();
 
@@ -90,7 +90,7 @@ export default function RootLayout() {
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  padding: 20,
+                  padding: 5,
                  }}
               >
                 <Ionicons
@@ -112,7 +112,7 @@ export default function RootLayout() {
                   <Text
                     style={{ fontSize: 16, fontWeight: "bold", color: "black" }}
                   >
-                    {Email || fullName || "Chat"}
+                    {email || fullName || "Chat"}
                   </Text>
                   {otherUserTyping && (
                     <Text style={{ fontSize: 12, color: "gray" }}>

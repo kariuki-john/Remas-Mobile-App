@@ -48,7 +48,7 @@ const NotificationScreen = () => {
   
     try {
      
-      await apiPost(`/bills-notifications/notification/read/${identifier}`);
+      await apiPost(`/bills-notifications/notification/read/{notificationId}`);
      
   
       // Remove the notification from the state (if needed)
