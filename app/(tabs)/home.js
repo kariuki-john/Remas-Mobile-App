@@ -30,8 +30,11 @@ const HomeScreen = () => {
   const [pageNumber, setPageNumber] = useState(0);
   const pageSize = 10;
   const [hasMore, setHasMore] = useState(true);
+  const [name, setName] = useState("");
 
   const fetchData = async (reset = false) => {
+    setName(await AsyncStorage.getItem("name"));
+
     try {
       setLoading(true);
       if (reset) {
@@ -212,7 +215,7 @@ const HomeScreen = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>My Dashboard</Text>
+          <Text style={styles.headerTitle}>Hello {name}</Text>
           <View style={styles.headerBadge}>
             <Text style={styles.headerBadgeText}>{roomDetails.length} Units</Text>
           </View>
@@ -310,7 +313,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
-    marginTop: 20,
+    marginTop: 22,
   },
   headerTitle: {
     fontSize: 24,
