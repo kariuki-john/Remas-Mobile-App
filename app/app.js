@@ -3,7 +3,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useTheme } from './ThemeContext'; 
 
-
 const Stack = createStackNavigator();
 
 const App = () => {

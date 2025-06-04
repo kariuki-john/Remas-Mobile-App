@@ -1,131 +1,63 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Image, ScrollView, Modal
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Linking,
+  ActivityIndicator,
+  Image
 } from 'react-native';
-import Feather from '@expo/vector-icons/Feather';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
-import { Picker } from '@react-native-picker/picker';
-import { apiPost, apiGet } from '../serviceApi';
-import { ImageBackground } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { apiGet } from '../serviceApi';
 
-
-export default function PaymentPage() {
-  const [paymentOption, setPaymentOption] = useState('mpesa');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [amount, setAmount] = useState('');
-  const [paymentPurpose, setPaymentPurpose] = useState('RENT');
+function PaymentPage() {
   const [loading, setLoading] = useState(false);
-  const [paymentChannelId, setPaymentChannelId] = useState(null);
-
-  const [airtelDetails, setAirtelDetails] = useState(null);
-  const [bankDetails, setBankDetails] = useState(null);
-
-  const [showModal, setShowModal] = useState(false);
-  const [modalMessage, setModalMessage] = useState('');
-  const [modalType, setModalType] = useState('success');
+  const [paymentPurpose, setPaymentPurpose] = useState('RENT');
+  const [depositBalance, setDepositBalance] = useState(15000); // Dummy data
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
 
   const router = useRouter();
-
   const {
     unitName, unitId, propertyName, propertyAddress,
     paymentMonthStart, paymentMonthEnd, requiredAmount, amountPaid,
   } = useLocalSearchParams();
 
-  useEffect(() => {
-    fetchPaymentOptions();
-  }, []);
-
-  const fetchPaymentOptions = async () => {
-    try {
-      const response = await apiGet(`/payment/getTenantUnitPaymentOptions?unitId=${unitId}`);
-      const options = response?.data || [];
-
-      const safaricomOption = options.find(opt => opt.channel === 'SAFARICOM' && opt.payOnline);
-      const airtelOption = options.find(opt => opt.channel === 'AIRTEL');
-      const bankOption = options.find(opt => opt.channel === 'BANK');
-
-      if (safaricomOption) {
-        setPaymentChannelId(safaricomOption.paymentChannelId);
-        setPaymentOption('mpesa');
-      } else if (airtelOption) {
-        setPaymentOption('airtel');
-        setPaymentChannelId(airtelOption.paymentChannelId);
-      } else if (bankOption) {
-        setPaymentOption('bank');
-        setPaymentChannelId(bankOption.paymentChannelId);
-      } else {
-        showToast('error', 'No Available Payment Channels');
-      }
-
-      setAirtelDetails(airtelOption);
-      setBankDetails(bankOption);
-
-    } catch (err) {
-      console.error('Failed to fetch payment options:', err);
-      showToast('error', 'Error', 'Failed to load payment options');
-    }
-  };
-
   const showToast = (type, text1, text2 = '') => {
-    Toast.show({ type, text1, text2, position: 'top', visibilityTime: 5000 });
+    Toast.show({ type, text1, text2, position: 'top', visibilityTime: 4000 });
   };
 
-  const handlePaymentOption = (option) => {
-    setPaymentOption(option);
-    if (option === 'bank') {
-      showToast('info', 'Bank integration coming soon');
-    }
-  };
-
-  const showTimedModal = (type, message) => {
-    setModalType(type);
-    setModalMessage(message);
-    setShowModal(true);
-
-    setTimeout(() => {
-      setShowModal(false);
-      clearForm();
-    }, 3000);
-  };
-
-  const clearForm = () => {
-    setPhoneNumber('');
-    setAmount('');
-    setPaymentPurpose('RENT');
-  };
-
-  const handleMpesaPay = async () => {
-    if (!phoneNumber || !amount) {
-      return showToast('error', 'Missing Info', 'Enter phone number and amount');
-    }
-    if (!paymentChannelId) {
-      return showToast('error', 'Missing Channel', 'No payment channel available');
+  const handleProceedToPayment = async () => {
+    if (!unitId || !paymentPurpose) {
+      showToast('error', 'Missing information', 'Please select payment type');
+      return;
     }
 
     setLoading(true);
     try {
-      const payload = {
-        phoneNumber: phoneNumber.startsWith('254') ? phoneNumber : `254${phoneNumber.slice(-9)}`,
-        amount: Number(amount),
-        paymentPurpose,
-        unitId: Number(unitId),
-        paymentChannelId,
-      };
+      const response = await apiGet(
+        `/checkout/rent-deposit-payment-token/${unitId}/${paymentPurpose}`
+      );
 
-      const response = await apiPost('/tenants/make-payment', payload);
-      console.log("Payment API Response:", response);
+      if (response?.data) {
+        const paymentUrl = `https://remas-ke.co.ke/checkout?token=${response.data}`;
+        const supported = await Linking.canOpenURL(paymentUrl);
 
-      if (response?.status === 200) {
-        showTimedModal('success', response?.message || 'Payment request sent');
+        if (supported) {
+          await Linking.openURL(paymentUrl);
+        } else {
+          showToast('error', 'Cannot open browser', 'Please try again later');
+        }
       } else {
-        showTimedModal('error', response?.message || 'Payment cancelled or failed');
+        showToast('error', 'Payment failed', 'Could not get payment token');
       }
-
     } catch (err) {
       console.error("Payment error:", err);
-      showTimedModal('error', 'Failed to send payment. Try again.');
+      showToast('error', 'Payment error', 'Failed to initiate payment');
     } finally {
       setLoading(false);
     }
@@ -133,117 +65,140 @@ export default function PaymentPage() {
 
   return (
     <View style={styles.container}>
-      <Feather name="arrow-left-circle" size={28} color="black" style={styles.raisedIcon} onPress={() => router.back()} />
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-  <ImageBackground
-    source={require('../../assets/images/card.jpg')}
-    style={styles.roomCard}
-    imageStyle={{ borderRadius: 12 }}
-  >
-    <Text style={styles.unitTitle}>{unitName}</Text>
-    <Text style={styles.propertyInfo}>{propertyName}, {propertyAddress}</Text>
-    <View style={styles.row}>
-      <Text style={styles.label}>Payment Term:</Text>
-      <Text style={styles.value}>{paymentMonthStart} - {paymentMonthEnd}</Text>
-    </View>
-    <View style={styles.row}>
-      <Text style={styles.label}>Total:</Text>
-      <Text style={[styles.value, styles.money]}>Kes {requiredAmount}</Text>
-    </View>
-    <View style={styles.row}>
-      <Text style={styles.label}>Paid:</Text>
-      <Text style={[styles.value, styles.moneyGreen]}>Kes {amountPaid}</Text>
-    </View>
-  </ImageBackground>
-</ScrollView>
-
-
-      <Text style={styles.paymentTitle}>Payment options (Use one)</Text>
-      <View style={styles.radioGroup}>
-        <TouchableOpacity onPress={() => handlePaymentOption('mpesa')} style={styles.radioOption}>
-          <Image source={require('../../assets/images/mpesa.png')} style={styles.image} />
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Feather name="chevron-left" size={24} color="#fff" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => handlePaymentOption('airtel')} style={styles.radioOption}>
-          <Image source={require('../../assets/images/airtelmoney.png')} style={styles.image} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => handlePaymentOption('bank')} style={styles.radioOption}>
-          <Image source={require('../../assets/images/bank.png')} style={styles.image} />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Make Payment</Text>
       </View>
 
-      {paymentOption === 'mpesa' && (
-        <View style={styles.centered}>
-          <View style={styles.formCard}>
-            <TextInput
-              style={styles.input}
-              placeholder="Phone number"
-              keyboardType="phone-pad"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Amount"
-              keyboardType="numeric"
-              value={amount}
-              onChangeText={setAmount}
-            />
-            <Picker
-              selectedValue={paymentPurpose}
-              onValueChange={(value) => setPaymentPurpose(value)}
-              style={styles.input}
-            >
-              <Picker.Item label="RENT" value="RENT" />
-              <Picker.Item label="DEPOSIT" value="DEPOSIT" />
-            </Picker>
-          </View>
-        </View>
-      )}
-
-      {paymentOption === 'airtel' && airtelDetails && (
-        <View style={styles.channelCard}>
-          <Text style={styles.channelTitle}>Airtel Payment</Text>
-          <Text style={styles.channelText}>Shortcode: <Text style={styles.channelValue}>{airtelDetails.shortCode || 'N/A'}</Text></Text>
-          <Text style={styles.channelText}>Account Number: <Text style={styles.channelValue}>{airtelDetails.rentAccountNumber} or {airtelDetails.depositAccountNumber}</Text></Text>
-          <Text style={styles.channelText}>Purpose: <Text style={styles.channelValue}>{paymentPurpose || 'RENT'} or DEPOSIT</Text></Text>
-        </View>
-      )}
-
-      {paymentOption === 'mpesa' && (
-        <TouchableOpacity
-          style={[styles.payButton, loading && { backgroundColor: '#A5D6A7' }]}
-          onPress={handleMpesaPay}
-          disabled={loading}
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* Property Card */}
+        <LinearGradient
+          colors={['#6C63FF', '#8A7DFF']}
+          style={styles.propertyCard}
         >
-          <Text style={styles.payText}>{loading ? 'Processing...' : 'PAY'}</Text>
-        </TouchableOpacity>
-      )}
+          <Text style={styles.propertyName}>{unitName}</Text>
+          <Text style={styles.propertyAddress}>{propertyName}, {propertyAddress}</Text>
 
-      <Modal
-        visible={showModal}
-        transparent
-        animationType="fade"
-      >
-        <View style={{
-          flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center'
-        }}>
-          <View style={{
-            width: 250, padding: 20, backgroundColor: 'white', borderRadius: 10, alignItems: 'center'
-          }}>
-            <Feather
-              name={modalType === 'success' ? 'check-circle' : 'x-circle'}
-              size={40}
-              color={modalType === 'success' ? '#4CAF50' : '#F44336'}
-              style={{ marginBottom: 10 }}
-            />
-            <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 5 }}>
-              {modalType === 'success' ? 'Payment stkPush Sent' : 'Payment Cancelled'}
-            </Text>
-            <Text style={{ textAlign: 'center' }}>{modalMessage}</Text>
+          <View style={styles.divider} />
+
+          <View style={styles.propertyDetails}>
+            <View style={styles.detailRow}>
+              <MaterialIcons name="date-range" size={18} color="#fff" />
+              <Text style={styles.detailText}>{paymentMonthStart} - {paymentMonthEnd}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <MaterialIcons name="attach-money" size={18} color="#fff" />
+              <Text style={styles.detailText}>Total: Kes {requiredAmount}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <MaterialIcons name="check-circle" size={18} color="#fff" />
+              <Text style={styles.detailText}>Paid: Kes {amountPaid}</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* Deposit Balance Card */}
+        <View style={styles.balanceCard}>
+          <Text style={styles.balanceTitle}>Your Deposit Balance</Text>
+          <Text style={styles.balanceAmount}>Kes {depositBalance.toLocaleString()}</Text>
+          <Text style={styles.balanceNote}>This amount will be refunded at the end of your lease</Text>
+        </View>
+
+        {/* Payment Type Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Payment Type</Text>
+
+          <View style={styles.paymentTypeContainer}>
+            <TouchableOpacity
+              style={[
+                styles.paymentTypeButton,
+                paymentPurpose === 'RENT' && styles.paymentTypeActive
+              ]}
+              onPress={() => setPaymentPurpose('RENT')}
+            >
+              <MaterialIcons
+                name="home"
+                size={24}
+                color={paymentPurpose === 'RENT' ? '#6C63FF' : '#999'}
+              />
+              <Text style={[
+                styles.paymentTypeText,
+                paymentPurpose === 'RENT' && styles.paymentTypeTextActive
+              ]}>
+                Rent Payment
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.paymentTypeButton,
+                paymentPurpose === 'DEPOSIT' && styles.paymentTypeActive
+              ]}
+              onPress={() => setPaymentPurpose('DEPOSIT')}
+            >
+              <MaterialIcons
+                name="security"
+                size={24}
+                color={paymentPurpose === 'DEPOSIT' ? '#6C63FF' : '#999'}
+              />
+              <Text style={[
+                styles.paymentTypeText,
+                paymentPurpose === 'DEPOSIT' && styles.paymentTypeTextActive
+              ]}>
+                Deposit
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+
+        {/* Payment Options (Optional - can be shown conditionally)
+        {showPaymentOptions && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Payment Method</Text>
+            <View style={styles.paymentMethods}>
+              <TouchableOpacity style={styles.methodButton}>
+                <Image
+                  source={require('../../assets/images/mpesa.png')}
+                  style={styles.methodImage}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.methodButton}>
+                <Image
+                  source={require('../../assets/images/visa.png')}
+                  style={styles.methodImage}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.methodButton}>
+                <Image
+                  source={require('../../assets/images/mastercard.png')}
+                  style={styles.methodImage}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )} */}
+      </ScrollView>
+
+      {/* Proceed Button */}
+      <TouchableOpacity
+        style={styles.proceedButton}
+        onPress={handleProceedToPayment}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.proceedButtonText}>Proceed to Payment</Text>
+        )}
+      </TouchableOpacity>
 
       <Toast />
     </View>
@@ -252,168 +207,170 @@ export default function PaymentPage() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 2,
-    padding: 10,
-    paddingTop: 40,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
+    flex: 1,
+    backgroundColor: '#f8f9fa',
   },
-  raisedIcon: {
-    shadowColor: 'white',
-    shadowOffset: { width: 5, height: 2 },
-    shadowOpacity: 1.5,
-    shadowRadius: 13,
-    padding: 5,
-  },
-roomCard: {
-  width: 320,
-  height: 200,
-  borderRadius: 12,
-  marginBottom: 20,
-  marginRight: 10,
-  overflow: 'hidden',
-  justifyContent: 'center',
-  padding: 16,
-  
-},
-unitTitle: {
-  fontSize: 22,
-  fontWeight: 'bold',
-  marginBottom: 6,
-  fontSize: 22,
-    fontStyle: 'italic',
-    fontWeight: 'bold',
-    color: '#FFD700',
-  textShadowColor: 'rgba(0, 0, 0, 0.6)',
-  textShadowOffset: { width: 1, height: 1 },
-  textShadowRadius: 2,
-},
-propertyInfo: {
-  fontSize: 14,
-  color: '#EEE',
-  marginBottom: 10,
-  textShadowColor: 'rgba(0, 0, 0, 0.6)',
-  textShadowOffset: { width: 1, height: 1 },
-  textShadowRadius: 2,
-  fontSize: 22,
-    fontStyle: 'italic',
-    fontWeight: 'bold',
-    color: '#FFD700',
-},
-
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#444',
-    fontSize: 15,
-    fontStyle: 'italic',
-    
-    color: '#FFD700',
-  },
-  value: {
-    fontSize: 15,
-    fontWeight: '600',
-    fontSize: 15,
-    fontStyle: 'italic',
-    fontWeight: 'small',
-    color: '#FFD700',
-  },
-  money: {
-    color: '#FFD700',
-  },
-  moneyGreen: {
-    color: '#FFD700',
-  },
-  paymentTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-    marginTop: 30,
-  },
-  radioGroup: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-  },
-  radioOption: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
+    paddingTop: 50,
+    backgroundColor: '#6C63FF',
   },
-  image: {
-    width: 100,
-    height: 50,
-    marginRight: 10,
-    backgroundColor: '#E3F2FD',
-    resizeMode: 'contain',
+  backButton: {
+    marginRight: 16,
   },
-  centered: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 20,
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
   },
-  formCard: {
-    backgroundColor: '#E3F2FD',
-    padding: 15,
-    borderRadius: 10,
-    width: 320,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
+  content: {
+    padding: 16,
+    paddingBottom: 80,
+  },
+  propertyCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
     elevation: 3,
-  },
-  input: {
-    height: 50,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    marginBottom: 10,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    backgroundColor: '#fff',
-  },
-  payButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginHorizontal: 40,
-    marginBottom: 30,
-  },
-  payText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  channelCard: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginHorizontal: 30,
-    marginTop: 10,
-    borderRadius: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 4,
   },
-  channelTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#1565C0',
+  propertyName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
   },
-  channelText: {
+  propertyAddress: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginVertical: 12,
+  },
+  propertyDetails: {
+    marginTop: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#fff',
+    marginLeft: 8,
+  },
+  balanceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  balanceTitle: {
     fontSize: 16,
-    marginBottom: 6,
-    color: '#333',
-  },
-  channelValue: {
     fontWeight: '600',
-    color: '#000',
+    color: '#333',
+    marginBottom: 8,
+  },
+  balanceAmount: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#4CAF50',
+    marginBottom: 4,
+  },
+  balanceNote: {
+    fontSize: 12,
+    color: '#666',
+  },
+  section: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  paymentTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  paymentTypeButton: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 8,
+    marginHorizontal: 4,
+  },
+  paymentTypeActive: {
+    borderColor: '#6C63FF',
+    backgroundColor: 'rgba(108, 99, 255, 0.1)',
+  },
+  paymentTypeText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999',
+    fontWeight: '500',
+  },
+  paymentTypeTextActive: {
+    color: '#6C63FF',
+    fontWeight: '600',
+  },
+  paymentMethods: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  methodButton: {
+    padding: 8,
+  },
+  methodImage: {
+    width: 60,
+    height: 40,
+  },
+  proceedButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: 16,
+    right: 16,
+    backgroundColor: '#6C63FF',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#6C63FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  proceedButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
+
+export default PaymentPage;

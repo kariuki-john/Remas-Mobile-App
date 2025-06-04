@@ -169,6 +169,8 @@ export const apiGet = async (endpoint) => {
   }
 };
 
+export const url = BASE_URL;
+
 
 export const apiPost = async (endpoint, data) => {
   try {

@@ -214,7 +214,7 @@ const ChatPage = () => {
       const res = await apiPost("/messages/send", payload);
       if (res.status === 200) {
         const messageData = { ...res.data, conversationId };
-       
+
         setNewMessage("");
         socketRef.current?.emit("sendMessage", messageData);
       } else {

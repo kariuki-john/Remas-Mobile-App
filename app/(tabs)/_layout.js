@@ -64,7 +64,7 @@ const LayoutContent = () => {
 
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 10000);
+//    const interval = setInterval(fetchUnreadCount, 10000);
     const listener = () => fetchUnreadCount();
     eventEmitter.on('updateUnreadBadge', listener);
 
