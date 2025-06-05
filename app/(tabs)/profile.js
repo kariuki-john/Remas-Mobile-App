@@ -11,7 +11,8 @@ import Animated, {
   withTiming,
   withSpring,
 } from 'react-native-reanimated';
-import { apiGet, apiPut } from '../serviceApi';
+import { apiGet, apiPost, apiPut } from '../serviceApi';
+import * as FileSystem from 'expo-file-system';
 
 export default function ProfilePage() {
   const [id, setId] = useState(0);
@@ -142,11 +143,49 @@ export default function ProfilePage() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
+      base64: false,
     });
 
-    if (!pickerResult.canceled) {
-      setImageUri(pickerResult.assets[0].uri);
-      animateImage();
+    if (pickerResult.canceled) return;
+
+    const asset = pickerResult.assets[0];
+    setImageUri(asset.uri);
+    animateImage();
+    uploadFile(pickerResult);
+  };
+
+  const uploadFile = async (pickerResult) => {
+    const asset = pickerResult.assets[0];
+
+    try {
+      // Get file info
+      const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+
+      // Read as base64 if needed
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const fileObj = {
+        uri: asset.uri,
+        name: asset.fileName || 'image.jpg',
+        type: asset.mimeType || 'image/jpeg',
+        size: fileInfo.size || 0,
+        base64: base64,
+        lastModified: fileInfo.modificationTime || Date.now(),
+      };
+      const formData = new FormData();
+      formData.append('file', fileObj);
+
+      try {
+        await apiPost('/user/profile-picture', formData);
+      } catch (err) {
+        console.error('Upload failed:', err);
+      }
+      return fileObj;
+    } catch (error) {
+      console.error('Error:', error);
+      return null;
     }
   };
 
@@ -191,8 +230,8 @@ export default function ProfilePage() {
           <Text style={styles.headerSubtitle}>Manage your personal information</Text>
         </Animated.View>
 
-        <ScrollView 
-          style={styles.scrollView} 
+        <ScrollView
+          style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
@@ -227,8 +266,8 @@ export default function ProfilePage() {
                 {renderInput('Phone Number', contactNumber, setContactNumber, 'call-outline', 'phone-pad')}
 
                 <View style={styles.buttonRow}>
-                  <TouchableOpacity 
-                    onPress={handleSave} 
+                  <TouchableOpacity
+                    onPress={handleSave}
                     style={[styles.saveButton, loading && styles.buttonDisabled]}
                     disabled={loading}
                   >
@@ -237,9 +276,9 @@ export default function ProfilePage() {
                       {loading ? 'Saving...' : 'Save Changes'}
                     </Text>
                   </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    onPress={() => setEditMode(false)} 
+
+                  <TouchableOpacity
+                    onPress={() => setEditMode(false)}
                     style={styles.cancelButton}
                     disabled={loading}
                   >
@@ -301,6 +340,7 @@ const styles = {
   },
   scrollView: {
     flex: 1,
+    marginTop: -30,
   },
   scrollContent: {
     paddingBottom: 30,

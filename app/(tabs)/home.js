@@ -265,9 +265,10 @@ const HomeScreen = () => {
           {filteredTransactions.length > 0 ? (
             <FlatList
               data={filteredTransactions}
+              style={{height: '40vh', marginBottom: '20%'}}
               renderItem={renderTransactionItem}
               keyExtractor={(item, index) => index.toString()}
-              scrollEnabled={false}
+              scrollEnabled={true}
               ListFooterComponent={
                 hasMore && (
                   <TouchableOpacity 
