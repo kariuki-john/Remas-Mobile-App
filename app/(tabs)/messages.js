@@ -184,10 +184,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f7',
     paddingHorizontal: 16,
-<<<<<<< HEAD
-=======
-    paddingTop: 60,
->>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
   },
   header: {
     flexDirection: 'row',

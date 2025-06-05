@@ -274,11 +274,7 @@ const HomeScreen = () => {
           {filteredTransactions.length > 0 ? (
             <FlatList
               data={filteredTransactions}
-<<<<<<< HEAD
               style={{height: '40vh', marginBottom: '30%'}}
-=======
-              style={{height: '40vh', marginBottom: '20%'}}
->>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
               renderItem={renderTransactionItem}
               keyExtractor={(item, index) => index.toString()}
               scrollEnabled={true}
@@ -327,10 +323,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
-<<<<<<< HEAD
-=======
-    marginTop: 25
->>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
   },
   headerTitle: {
     fontSize: 24,
