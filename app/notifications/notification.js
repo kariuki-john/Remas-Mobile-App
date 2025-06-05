@@ -37,24 +37,13 @@ const NotificationScreen = () => {
   };
 
   const markAsRead = async (notification) => {
-    const notificationKey = createNotificationKey(notification);
-    const identifier = notification.refId;  
-  
-    // Check if identifier is invalid
-    if (!identifier || identifier <= 0) {
-      
-      return;
-    }
   
     try {
      
-      await apiPost(`/bills-notifications/notification/read/{notificationId}`);
+      await apiPost(`/bills-notifications/notification/read/${notification.id}`);
      
   
       // Remove the notification from the state (if needed)
-      setNotifications(prevNotifications => 
-        prevNotifications.filter(item => createNotificationKey(item) !== notificationKey)
-      );
   
       // Emit event to update the unread badge
       eventEmitter.emit('updateUnreadBadge');

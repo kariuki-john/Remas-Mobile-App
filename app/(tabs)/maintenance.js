@@ -11,13 +11,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   FlatList,
+  Image,
+  Linking
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import Toast from "react-native-toast-message";
 import { apiGet, apiPost, apiPostData } from "../serviceApi";
-import { Animated } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons, MaterialIcons, FontAwesome } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
-const RequestPage = () => {
+const MaintenancePage = () => {
+  const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [properties, setProperties] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -26,25 +31,27 @@ const RequestPage = () => {
   const [severity, setSeverity] = useState("LOW");
   const [description, setDescription] = useState("");
   const [requests, setRequests] = useState([]);
-  const [filter, setFilter] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [maintenanceType, setMaintenanceType] = useState("Personal");
   const [pageNumber, setPageNumber] = useState(0);
+  const [pageSize, setPageSize] = useState(5);
   const [totalPages, setTotalPages] = useState(1);
   const [technicianModalVisible, setTechnicianModalVisible] = useState(false);
   const [technicians, setTechnicians] = useState([]);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [selectedTechnician, setSelectedTechnician] = useState(null);
-  const [technicianDetailModalVisible, setTechnicianDetailModalVisible] =
-    useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [requestId, setRequestId] = useState('');
 
+  // Fetch data functions
   const fetchProperties = async () => {
     try {
       const res = await apiGet("/tenants/units");
       setProperties(res?.data || []);
     } catch (err) {
       console.error(err);
+      Toast.show({ type: "error", text1: "Failed to load properties" });
     }
   };
 
@@ -54,6 +61,7 @@ const RequestPage = () => {
       setCategories(res?.data || []);
     } catch (err) {
       console.error(err);
+      Toast.show({ type: "error", text1: "Failed to load categories" });
     }
   };
 
@@ -67,42 +75,48 @@ const RequestPage = () => {
       setTotalPages(res?.data?.totalPages || 1);
     } catch (err) {
       console.error(err);
+      Toast.show({ type: "error", text1: "Failed to load requests" });
+    } finally {
+      setRefreshing(false);
     }
   };
 
-  // Fetch technicians
   const fetchTechnicians = async () => {
     try {
-      const res = await apiGet(
-        "/maintenance/user/technician-requests/applications"
-      );
-      setTechnicians(res?.data || []);
+      var getData = {
+        pageNumber: pageNumber,
+        pageSize: pageSize,
+        requestId: requestId
+      }
+      const res = await apiPost("/maintenance/user/technician-requests/applications", getData);
+      setTechnicians(res?.data?.content || []);
     } catch (err) {
       console.error("Error fetching technicians", err);
+      Toast.show({ type: "error", text1: "Failed to load technicians" });
     }
   };
 
-  // Handle card press
+  // Handle actions
   const handleCardPress = async (req) => {
     setSelectedRequest(req);
+    setRequestId(req.requestId);
     await fetchTechnicians();
     setTechnicianModalVisible(true);
   };
 
-  // Handle assign
   const assignTechnician = async (technician) => {
     try {
       const payload = {
         requestId: selectedRequest.requestId,
         technicianId: technician.id,
       };
-      const res = await apiPost("/maintenance/user/assign-technician", payload); 
+      const res = await apiPost("/maintenance/user/assign-technician", payload);
       if (res?.status === 200) {
-        Toast.show({ type: "success", text1: "Technician Assigned" });
+        Toast.show({ type: "success", text1: "Technician assigned successfully" });
         setTechnicianModalVisible(false);
-        fetchRequests(); 
+        fetchRequests();
       } else {
-        Toast.show({ type: "error", text1: "Assign failed" });
+        Toast.show({ type: "error", text1: "Failed to assign technician" });
       }
     } catch (err) {
       console.error(err);
@@ -111,6 +125,11 @@ const RequestPage = () => {
   };
 
   const handleSave = async () => {
+    if (!selectedProperty || !selectedCategory || !description) {
+      Toast.show({ type: "error", text1: "Please fill all required fields" });
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = {
@@ -124,29 +143,54 @@ const RequestPage = () => {
       const response = await apiPost("/maintenance/tenant/request", payload);
 
       if (response?.status === 200) {
-        Toast.show({
-          type: "success",
-          text1: "Maintenance request sent successfully",
-        });
+        Toast.show({ type: "success", text1: "Request submitted successfully" });
         setShowForm(false);
         fetchRequests();
+        resetForm();
       } else {
-        Toast.show({
-          type: "error",
-          text1: "Failed to send request",
-          text2: response?.data?.message || "Unexpected response",
-        });
+        Toast.show({ type: "error", text1: "Failed to submit request" });
       }
     } catch (err) {
       console.error(err);
-      Toast.show({
-        type: "error",
-        text1: "Failed to send request",
-        text2: err?.message || "An error occurred",
-      });
+      Toast.show({ type: "error", text1: "Error submitting request" });
     } finally {
       setLoading(false);
     }
+  };
+
+  const getTechDetails = async (technician) => {
+    const email = technician.techEmail
+    try {
+      const tokenResults = await apiGet(`/user/tech-token/${email}`)
+
+      if (tokenResults?.data) {
+        const token = tokenResults.data;
+        const techUrl = `https://remas-ke.co.ke/technician-details?token=${token}`;
+        const supported = await Linking.canOpenURL(techUrl);
+
+        if (supported) {
+          await Linking.openURL(techUrl);
+        } else {
+          showToast('error', 'Cannot open browser', 'Please try again later');
+        }
+      } else {
+        showToast('error', 'Tech fetch failed', 'Could not get tech token');
+      }
+    } catch (error) {
+      console.log("There was an error:", error);
+
+    }
+  }
+
+  const resetForm = () => {
+    setSelectedProperty(null);
+    setSelectedCategory(null);
+    setDescription("");
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchRequests();
   };
 
   useEffect(() => {
@@ -155,280 +199,351 @@ const RequestPage = () => {
     fetchRequests();
   }, [pageNumber]);
 
+  // Render components
+  const renderRequestItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.requestCard}
+      onPress={() => handleCardPress(item)}
+    >
+      <View style={styles.requestHeader}>
+        <Text style={styles.requestId}>Request #{item.requestId}</Text>
+        <View style={[
+          styles.severityBadge,
+          item.severity === "HIGH" ? styles.highSeverity :
+            item.severity === "MEDIUM" ? styles.mediumSeverity : styles.lowSeverity
+        ]}>
+          <Text style={styles.severityText}>{item.severity}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.propertyText}>{item.unitName} - {item.propertyName}</Text>
+      <Text style={styles.descriptionText}>{item.description}</Text>
+
+      <View style={styles.requestFooter}>
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusText}>{item.status || "PENDING"}</Text>
+        </View>
+        <Text style={styles.dateText}>
+          {new Date(item.createdAt).toLocaleDateString()}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderTechnicianItem = ({ item }) => (
+    <View style={styles.technicianCard}>
+      <View style={styles.technicianInfo}>
+        <FontAwesome name="user-circle" size={40} color="#6C63FF" />
+        <View style={styles.technicianDetails}>
+          <Text style={styles.technicianName}>{item.fullName}</Text>
+          <Text style={styles.technicianSpecialty}>{item.techEmail || "General Maintenance"}</Text>
+        </View>
+      </View>
+
+      <View style={styles.technicianActions}>
+        <TouchableOpacity
+          style={styles.detailButton}
+          onPress={() => getTechDetails(item)}
+        >
+          <Text style={styles.detailButtonText}>Details</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.assignButton}
+          onPress={() => assignTechnician(item)}
+        >
+          <Text style={styles.assignButtonText}>Assign</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.newRequestButton}
-        onPress={() => setShowForm(true)}
+      {/* Header */}
+      <LinearGradient
+        colors={['#6C63FF', '#8A7DFF']}
+        style={styles.header}
       >
-        <Text style={styles.newRequestButtonText}>New Request</Text>
-      </TouchableOpacity>
+        <Text style={styles.headerTitle}>Maintenance Requests</Text>
+        <TouchableOpacity
+          style={styles.newRequestButton}
+          onPress={() => setShowForm(true)}
+        >
+          <Ionicons name="add" size={24} color="white" />
+          <Text style={styles.newRequestButtonText}>New Request</Text>
+        </TouchableOpacity>
+      </LinearGradient>
 
-      <View style={styles.filterContainer}>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
         <TextInput
-          style={styles.input}
-          placeholder="Filter"
-          value={filter}
-          onChangeText={setFilter}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Search"
+          style={styles.searchInput}
+          placeholder="Search requests..."
+          placeholderTextColor="#999"
           value={search}
           onChangeText={setSearch}
         />
       </View>
 
-      <ScrollView style={styles.scrollArea}>
-        {requests
-          .filter((r) =>
-            r.description.toLowerCase().includes(search.toLowerCase())
-          )
-          .map((req, idx) => (
-            <TouchableOpacity
-              key={idx}
-              style={styles.requestCardStyled}
-              onPress={() => handleCardPress(req)}
-            >
-              <Text style={{ fontWeight: "bold" }}>Req ID:{req.requestId}</Text>
-              <Text>
-                {req.unitName}-{req.propertyName}
-              </Text>
-              <Text>{req.description}</Text>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  marginTop: 8,
-                }}
-              >
-                <Text
-                  style={[
-                    styles.status,
-                    { backgroundColor: "#d1fadf", color: "#15803d" },
-                  ]}
-                >
-                  Level:{req.level}
-                </Text>
-                <Text
-                  style={[
-                    styles.severity,
-                    {
-                      backgroundColor:
-                        req.severity === "HIGH" ? "#fef2f2" : "#fff7ed",
-                      color: req.severity === "HIGH" ? "#b91c1c" : "#92400e",
-                    },
-                  ]}
-                >
-                  {req.severity}
-                </Text>
-              </View>
-              <Text style={styles.ownerName}>{req.ownerName}</Text>
-            </TouchableOpacity>
-          ))}
-      </ScrollView>
+      {/* Requests List */}
+      <FlatList
+        data={requests.filter(r =>
+          r.description.toLowerCase().includes(search.toLowerCase()) ||
+          r.requestId.includes(search)
+        )}
+        renderItem={renderRequestItem}
+        keyExtractor={(item) => item.requestId}
+        contentContainerStyle={styles.listContent}
+        // refreshControl={
+        //   <RefreshControl
+        //     refreshing={refreshing}
+        //     onRefresh={onRefresh}
+        //     colors={['#6C63FF']}
+        //   />
+        // }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Image
+              source={require('../../assets/images/bank.png')}
+              style={styles.emptyImage}
+            />
+            <Text style={styles.emptyText}>No maintenance requests yet</Text>
+            <Text style={styles.emptySubtext}>Create your first request by clicking above</Text>
+          </View>
+        }
+      />
 
+      {/* Pagination */}
       <View style={styles.paginationContainer}>
         <TouchableOpacity
+          style={[styles.paginationButton, pageNumber <= 0 && styles.disabledButton]}
+          onPress={() => setPageNumber(prev => Math.max(prev - 1, 0))}
           disabled={pageNumber <= 0}
-          onPress={() => setPageNumber((prev) => Math.max(prev - 1, 0))}
-          style={styles.paginationButton}
         >
-          <Text>Previous</Text>
+          <Ionicons name="chevron-back" size={20} color={pageNumber <= 0 ? "#ccc" : "#6C63FF"} />
+          <Text style={[styles.paginationText, pageNumber <= 0 && styles.disabledText]}>Previous</Text>
         </TouchableOpacity>
-        <Text>{`Page ${pageNumber + 1} of ${totalPages}`}</Text>
+
+        <Text style={styles.pageText}>Page {pageNumber + 1} of {totalPages}</Text>
+
         <TouchableOpacity
+          style={[styles.paginationButton, pageNumber + 1 >= totalPages && styles.disabledButton]}
+          onPress={() => setPageNumber(prev => prev + 1)}
           disabled={pageNumber + 1 >= totalPages}
-          onPress={() => setPageNumber((prev) => prev + 1)}
-          style={styles.paginationButton}
         >
-          <Text>Next</Text>
+          <Text style={[styles.paginationText, pageNumber + 1 >= totalPages && styles.disabledText]}>Next</Text>
+          <Ionicons name="chevron-forward" size={20} color={pageNumber + 1 >= totalPages ? "#ccc" : "#6C63FF"} />
         </TouchableOpacity>
       </View>
-      <Modal visible={showForm} transparent animationType="fade">
+
+      {/* New Request Modal */}
+      <Modal visible={showForm} transparent animationType="slide">
         <KeyboardAvoidingView
-          style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={100}
+          style={styles.modalContainer}
         >
-          <ScrollView
-            contentContainerStyle={styles.modalScrollContainer}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Animated.View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>New Request</Text>
+          <ScrollView contentContainerStyle={styles.modalScrollContainer}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>New Maintenance Request</Text>
+                <TouchableOpacity onPress={() => setShowForm(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
 
-              <Text style={styles.label}>Unit</Text>
-              <Picker
-                selectedValue={selectedProperty}
-                onValueChange={setSelectedProperty}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select Unit" value="" />
-                {properties.map((prop) => (
-                  <Picker.Item
-                    key={prop.unitId}
-                    label={`${prop.unitName}-${prop.propertyName}`}
-                    value={prop.unitId}
-                  />
-                ))}
-              </Picker>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Property Unit *</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={selectedProperty}
+                    onValueChange={setSelectedProperty}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select your unit" value={null} />
+                    {properties.map((prop) => (
+                      <Picker.Item
+                        key={prop.unitId}
+                        label={`${prop.unitName} - ${prop.propertyName}`}
+                        value={prop.unitId}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
 
-              <Text style={styles.label}>Category Type</Text>
-              <Picker
-                selectedValue={selectedCategory}
-                onValueChange={setSelectedCategory}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select Category Type" value="" />
-                {categories.map((cat) => (
-                  <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
-                ))}
-              </Picker>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Category *</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Select category" value={null} />
+                    {categories.map((cat) => (
+                      <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
 
-              <Text style={styles.label}>Maintenance Type</Text>
-              <Picker
-                selectedValue={maintenanceType}
-                onValueChange={setMaintenanceType}
-                style={styles.picker}
-              >
-                <Picker.Item label="PERSONAL" value="Personal" />
-                <Picker.Item label="PROPERTY" value="Property" />
-              </Picker>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Type</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={maintenanceType}
+                    onValueChange={setMaintenanceType}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Personal" value="Personal" />
+                    <Picker.Item label="Property" value="Property" />
+                  </Picker>
+                </View>
+              </View>
 
-              <Text style={styles.label}>Severity</Text>
-              <Picker
-                selectedValue={severity}
-                onValueChange={setSeverity}
-                style={styles.picker}
-              >
-                <Picker.Item label="LOW" value="LOW" />
-                <Picker.Item label="MEDIUM" value="MEDIUM" />
-                <Picker.Item label="HIGH" value="HIGH" />
-              </Picker>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Severity</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={severity}
+                    onValueChange={setSeverity}
+                    style={styles.picker}
+                  >
+                    <Picker.Item label="Low" value="LOW" />
+                    <Picker.Item label="Medium" value="MEDIUM" />
+                    <Picker.Item label="High" value="HIGH" />
+                  </Picker>
+                </View>
+              </View>
 
-              <Text style={styles.label}>Description</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                multiline
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Describe the issue..."
-              />
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Description *</Text>
+                <TextInput
+                  style={styles.textArea}
+                  multiline
+                  numberOfLines={4}
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder="Describe the issue in detail..."
+                  placeholderTextColor="#999"
+                />
+              </View>
 
-              <View style={styles.buttonRow}>
+              <View style={styles.buttonGroup}>
                 <TouchableOpacity
                   style={styles.cancelButton}
                   onPress={() => setShowForm(false)}
                 >
-                  <Text>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.saveButton}
+                  style={styles.submitButton}
                   onPress={handleSave}
                   disabled={loading}
                 >
                   {loading ? (
                     <ActivityIndicator color="white" />
                   ) : (
-                    <Text style={styles.saveButtonText}>Save</Text>
+                    <Text style={styles.submitButtonText}>Submit Request</Text>
                   )}
                 </TouchableOpacity>
               </View>
-            </Animated.View>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
 
-      <Toast />
-      <Modal visible={technicianModalVisible} animationType="slide" transparent>
-        <View style={styles.modalScrollContainer}>
-          <View style={[styles.modalContent, { maxHeight: "90%" }]}>
-            <Text style={styles.modalTitle}>Select Technician</Text>
+      {/* Technician Selection Modal */}
+      <Modal visible={technicianModalVisible} transparent animationType="slide">
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, styles.technicianModal]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Assign Technician</Text>
+              <TouchableOpacity onPress={() => setTechnicianModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>Select a technician for Request #{selectedRequest?.requestId}</Text>
+
             <FlatList
               data={technicians}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <View
-                  style={[
-                    styles.requestCardStyled,
-                    { backgroundColor: "#f9fafb" },
-                  ]}
-                >
-                  <Text style={{ fontWeight: "bold" }}>{item.fullName}</Text>
-                  <Text>{item.email}</Text>
-                  <Text>{item.phoneNumber}</Text>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      marginTop: 10,
-                    }}
-                  >
-                    <TouchableOpacity
-                      style={[styles.cancelButton, { flex: 1, marginRight: 8 }]}
-                      onPress={() => {
-                        setSelectedTechnician(item);
-                        setTechnicianDetailModalVisible(true);
-                      }}
-                    >
-                      <Text>More</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.saveButton, { flex: 1 }]}
-                      onPress={() => assignTechnician(item)}
-                    >
-                      <Text style={styles.saveButtonText}>Assign</Text>
-                    </TouchableOpacity>
-                  </View>
+              renderItem={renderTechnicianItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.technicianList}
+              ListEmptyComponent={
+                <View style={styles.emptyTechnicianContainer}>
+                  <MaterialIcons name="handyman" size={48} color="#ccc" />
+                  <Text style={styles.emptyTechnicianText}>No available technicians</Text>
                 </View>
-              )}
+              }
             />
-            <TouchableOpacity
-              onPress={() => setTechnicianModalVisible(false)}
-              style={[styles.cancelButton, { marginTop: 20 }]}
-            >
-              <Text>Close</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      <Modal
-        visible={technicianDetailModalVisible}
-        animationType="fade"
-        transparent
-      >
-        <View style={styles.modalScrollContainer}>
-          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
-            <Text style={styles.modalTitle}>Technician Details</Text>
+      {/* Technician Detail Modal */}
+      <Modal visible={!!selectedTechnician} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, styles.detailModal]}>
             {selectedTechnician && (
               <>
-                <Text style={styles.label}>Name:</Text>
-                <Text>{selectedTechnician.fullName}</Text>
+                <View style={styles.technicianProfile}>
+                  <FontAwesome name="user-circle" size={80} color="#6C63FF" />
+                  <Text style={styles.technicianName}>{selectedTechnician.fullName}</Text>
+                  <Text style={styles.technicianTitle}>{selectedTechnician.specialty || "Maintenance Technician"}</Text>
+                </View>
 
-                <Text style={styles.label}>Email:</Text>
-                <Text>{selectedTechnician.email}</Text>
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailLabel}>Contact Information</Text>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="mail" size={20} color="#666" />
+                    <Text style={styles.detailText}>{selectedTechnician.email}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="call" size={20} color="#666" />
+                    <Text style={styles.detailText}>{selectedTechnician.phoneNumber || "Not provided"}</Text>
+                  </View>
+                </View>
 
-                <Text style={styles.label}>Phone:</Text>
-                <Text>{selectedTechnician.phoneNumber}</Text>
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailLabel}>Skills & Experience</Text>
+                  <Text style={styles.detailText}>
+                    {selectedTechnician.experience || "No experience information"}
+                  </Text>
+                  <View style={styles.skillsContainer}>
+                    {(selectedTechnician.skills || []).map((skill, index) => (
+                      <View key={index} style={styles.skillTag}>
+                        <Text style={styles.skillText}>{skill}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
 
-                <Text style={styles.label}>Experience:</Text>
-                <Text>{selectedTechnician.experience || "N/A"}</Text>
-
-                <Text style={styles.label}>Skills:</Text>
-                <Text>{selectedTechnician.skills?.join(", ") || "N/A"}</Text>
+                <TouchableOpacity
+                  style={styles.assignButton}
+                  onPress={() => {
+                    assignTechnician(selectedTechnician);
+                    setSelectedTechnician(null);
+                  }}
+                >
+                  <Text style={styles.assignButtonText}>Assign This Technician</Text>
+                </TouchableOpacity>
               </>
             )}
+
             <TouchableOpacity
-              onPress={() => setTechnicianDetailModalVisible(false)}
-              style={[styles.cancelButton, { marginTop: 20 }]}
+              style={styles.closeButton}
+              onPress={() => setSelectedTechnician(null)}
             >
-              <Text>Close</Text>
+              <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      <Toast />
     </View>
   );
 };
@@ -436,151 +551,415 @@ const RequestPage = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    marginTop: 56,
-    backgroundColor: "#ffffff",
+    backgroundColor: '#f8f9fa',
+    marginTop: 20
+  },
+  header: {
+    padding: 20,
+    paddingTop: 50,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'white',
   },
   newRequestButton: {
-    backgroundColor: "#2563EB",
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
   },
-  modalScrollContainer: {
-    flexGrow: 1,
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-    padding: 16,
-  },
-  modalContent: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-
   newRequestButtonText: {
-    color: "white",
-    textAlign: "center",
-    fontWeight: "bold",
-    fontSize: 18,
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 5,
   },
-  filterContainer: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 16,
-  },
-  input: {
-    flex: 1,
-    borderColor: "#d1d5db",
-    borderWidth: 1,
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: "#f9f9f9",
-  },
-  scrollArea: {
-    flex: 1,
-  },
-  requestCardStyled: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 8,
-    shadowColor: "#000",
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    margin: 15,
+    marginTop: 20,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  status: {
-    fontSize: 12,
-    fontWeight: "bold",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    overflow: "hidden",
+  searchIcon: {
+    marginRight: 10,
   },
-  severity: {
-    fontSize: 12,
-    fontWeight: "bold",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    overflow: "hidden",
+  searchInput: {
+    flex: 1,
+    height: 45,
+    fontSize: 16,
+    color: '#333',
   },
-  assignee: {
-    marginTop: 8,
-    backgroundColor: "#374151",
-    color: "white",
-    alignSelf: "flex-start",
+  listContent: {
+    padding: 15,
+    paddingBottom: 80,
+  },
+  requestCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  requestId: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  severityBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 12,
+  },
+  highSeverity: {
+    backgroundColor: '#fee2e2',
+  },
+  mediumSeverity: {
+    backgroundColor: '#fef3c7',
+  },
+  lowSeverity: {
+    backgroundColor: '#dcfce7',
+  },
+  severityText: {
     fontSize: 12,
+    fontWeight: '600',
+  },
+  propertyText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: '#444',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  requestFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0369a1',
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#999',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyImage: {
+    width: 150,
+    height: 150,
+    marginBottom: 20,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    fontWeight: '500',
+    marginBottom: 5,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
   paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   paginationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 8,
-    backgroundColor: "#e5e7eb",
     borderRadius: 8,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  paginationText: {
+    marginHorizontal: 5,
+    color: '#6C63FF',
+    fontWeight: '500',
+  },
+  disabledText: {
+    color: '#ccc',
+  },
+  pageText: {
+    color: '#666',
+    fontWeight: '500',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "white",
-    padding: 16,
-    marginTop: 64,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+  },
+  modalScrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    margin: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  formGroup: {
     marginBottom: 16,
   },
   label: {
-    marginTop: 12,
-    marginBottom: 4,
-    fontWeight: "600",
-  },
-  picker: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#444',
     marginBottom: 8,
   },
-  textArea: {
-    height: 100,
-    textAlignVertical: "top",
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    overflow: 'hidden',
   },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  picker: {
+    height: 50,
+    width: '100%',
+    backgroundColor: '#f8f9fa',
+  },
+  textArea: {
+    height: 120,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 12,
+    textAlignVertical: 'top',
+    backgroundColor: '#f8f9fa',
+    fontSize: 14,
+    color: '#333',
+  },
+  buttonGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginTop: 20,
   },
   cancelButton: {
-    backgroundColor: "#e5e7eb",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    flex: 1,
+    padding: 14,
+    backgroundColor: '#f1f3f5',
+    borderRadius: 10,
+    alignItems: 'center',
+    marginRight: 10,
   },
-  saveButton: {
-    backgroundColor: "#2563EB",
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+  cancelButtonText: {
+    color: '#666',
+    fontWeight: '600',
   },
-  saveButtonText: {
-    color: "white",
-    fontWeight: "bold",
+  submitButton: {
+    flex: 1,
+    padding: 14,
+    backgroundColor: '#6C63FF',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  technicianModal: {
+    maxHeight: '80%',
+  },
+  technicianList: {
+    paddingBottom: 20,
+  },
+  technicianCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  technicianInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  technicianDetails: {
+    marginLeft: 12,
+  },
+  technicianName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  technicianSpecialty: {
+    fontSize: 14,
+    color: '#666',
+  },
+  technicianActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  detailButton: {
+    flex: 1,
+    padding: 10,
+    backgroundColor: '#f1f3f5',
+    borderRadius: 8,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  detailButtonText: {
+    color: '#666',
+    fontWeight: '500',
+  },
+  assignButton: {
+    flex: 1,
+    padding: 10,
+    backgroundColor: '#6C63FF',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  assignButtonText: {
+    color: '#fff',
+    fontWeight: '500',
+  },
+  emptyTechnicianContainer: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyTechnicianText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 10,
+  },
+  detailModal: {
+    maxHeight: '90%',
+  },
+  technicianProfile: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  technicianTitle: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 5,
+  },
+  detailSection: {
+    marginBottom: 20,
+  },
+  detailLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#444',
+    marginBottom: 10,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 10,
+  },
+  skillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
+  },
+  skillTag: {
+    backgroundColor: '#e0e7ff',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  skillText: {
+    fontSize: 12,
+    color: '#4f46e5',
+  },
+  closeButton: {
+    padding: 12,
+    backgroundColor: '#f1f3f5',
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  closeButtonText: {
+    color: '#666',
+    fontWeight: '500',
   },
 });
 
-export default RequestPage;
+export default MaintenancePage;

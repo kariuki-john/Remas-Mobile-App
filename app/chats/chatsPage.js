@@ -38,7 +38,7 @@ const decodeJWT = (token) => {
 const MessageBubble = React.memo(({ message }) => {
   const isSender = message.yourMessage;
   const bubbleStyle = {
-    backgroundColor: isSender ? "#99d1f5" : "#eeeeee",
+    backgroundColor: isSender ? "#7b70ff" : "#eeeeee",
     padding: 10,
     borderRadius: 10,
     maxWidth: "70%",
@@ -51,12 +51,12 @@ const MessageBubble = React.memo(({ message }) => {
         style={{ width: 35, height: 35, borderRadius: 20, marginHorizontal: 8 }}
       />
       <View style={bubbleStyle}>
-        <Text style={{ fontSize: 14 }}>{message.message}</Text>
+        <Text style={{ fontSize: 14, color: isSender ? "white" : "black" }}>{message.message}</Text>
         <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 5 }}>
-          <Text style={{ fontSize: 10, color: "gray" }}>
+          <Text style={{ fontSize: 10, color: isSender ? "rgba(255,255,255,0.7)" : "gray" }}>
             {message.timeStamp ? new Date(message.timeStamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "..."}
           </Text>
-          {isSender && <Text style={{ fontSize: 10, color: "blue", marginLeft: 4 }}>✓✓</Text>}
+          {isSender && <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.8)", marginLeft: 4 }}>✓✓</Text>}
         </View>
       </View>
     </View>
@@ -75,6 +75,13 @@ const ChatPage = () => {
   const flatListRef = useRef(null);
 
   const { conversationId, email: otherUserEmail } = useLocalSearchParams();
+
+  // Helper function to scroll to bottom
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
 
   useEffect(() => {
     const getEmail = async () => {
@@ -114,7 +121,12 @@ const ChatPage = () => {
       try {
         const parsed = typeof message === "string" ? JSON.parse(message) : message;
         if (parsed && parsed.message && !messages.some((m) => m.id === parsed.id)) {
-          setMessages((prevMessages) => [...prevMessages, parsed]);
+          setMessages((prevMessages) => {
+            const newMessages = [...prevMessages, parsed];
+            // Scroll to bottom after state update
+            setTimeout(() => scrollToBottom(), 50);
+            return newMessages;
+          });
         }
       } catch (err) {
         console.error("Error parsing message:", err);
@@ -164,6 +176,8 @@ const ChatPage = () => {
       if (res?.data && Array.isArray(res.data)) {
         const sorted = res.data.sort((a, b) => new Date(a.timeStamp) - new Date(b.timeStamp));
         setMessages(sorted);
+        // Scroll to bottom after fetching messages
+        setTimeout(() => scrollToBottom(), 200);
       } else {
         setMessages([]);
       }
@@ -182,7 +196,7 @@ const ChatPage = () => {
 
   useEffect(() => {
     if (messages.length > 0) {
-      flatListRef.current?.scrollToEnd({ animated: true });
+      scrollToBottom();
     }
   }, [messages]);
 
@@ -214,9 +228,12 @@ const ChatPage = () => {
       const res = await apiPost("/messages/send", payload);
       if (res.status === 200) {
         const messageData = { ...res.data, conversationId };
-       
+
         setNewMessage("");
         socketRef.current?.emit("sendMessage", messageData);
+        
+        // Scroll to bottom after sending message
+        setTimeout(() => scrollToBottom(), 50);
       } else {
         Toast.show({ type: "error", text1: "Failed to send message", text2: res.message || "Server error" });
       }
@@ -239,6 +256,8 @@ const ChatPage = () => {
         renderItem={renderMessageItem}
         contentContainerStyle={{ padding: 10, flexGrow: 1, justifyContent: "flex-end" }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onContentSizeChange={() => scrollToBottom()}
+        onLayout={() => scrollToBottom()}
         ListEmptyComponent={!loading ? (
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
             <Text style={{ textAlign: "center", padding: 20, color: "gray" }}>No messages yet. Start the conversation!</Text>
@@ -256,7 +275,7 @@ const ChatPage = () => {
           onChangeText={handleTyping}
         />
         <TouchableOpacity onPress={sendMessage} disabled={loading} style={{ marginLeft: 10 }}>
-          <Ionicons name="send" size={24} color={loading ? "#ccc" : "#99d1f5"} />
+          <Ionicons name="send" size={24} color={loading ? "#ccc" : "#7b70ff"} />
         </TouchableOpacity>
       </View>
 
