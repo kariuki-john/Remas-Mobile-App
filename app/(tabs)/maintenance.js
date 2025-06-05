@@ -264,7 +264,11 @@ const MaintenancePage = () => {
         colors={['#6C63FF', '#8A7DFF']}
         style={styles.header}
       >
+<<<<<<< HEAD
         <Text style={styles.headerTitle}>Requests</Text>
+=======
+        <Text style={styles.headerTitle}>Maintenance Requests</Text>
+>>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
         <TouchableOpacity
           style={styles.newRequestButton}
           onPress={() => setShowForm(true)}
@@ -552,6 +556,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+<<<<<<< HEAD
+=======
+    marginTop: 20
+>>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
   },
   header: {
     padding: 20,

@@ -222,9 +222,15 @@ export default function ProfilePage() {
 
   return (
     <>
+<<<<<<< HEAD
       {/* Remove StatusBar component since it's handled in layout */}
       <View style={styles.container}>
         {/* Header Section - Adjusted to work with layout header */}
+=======
+      <StatusBar barStyle="light-content" backgroundColor="#7b70ff" />
+      <View style={styles.container}>
+        {/* Header Section */}
+>>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
         <Animated.View style={[styles.header, animatedHeaderStyle]}>
           <Text style={styles.headerTitle}>My Profile</Text>
           <Text style={styles.headerSubtitle}>Manage your personal information</Text>
@@ -320,7 +326,11 @@ const styles = {
   },
   header: {
     backgroundColor: '#7b70ff',
+<<<<<<< HEAD
     paddingTop: 20, // Reduced padding since header is handled by layout
+=======
+    paddingTop: 60,
+>>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
     paddingBottom: 30,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 25,
@@ -395,7 +405,11 @@ const styles = {
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
+<<<<<<< HEAD
     marginBottom: '25%' // Increased to account for tab bar
+=======
+    marginBottom: '20%'
+>>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
   },
   sectionTitle: {
     fontSize: 20,

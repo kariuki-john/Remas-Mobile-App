@@ -8,9 +8,13 @@ import {
   Modal,
   Pressable,
   Animated,
+<<<<<<< HEAD
   Easing,
   StatusBar,
   Platform
+=======
+  Easing
+>>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -105,21 +109,31 @@ const LayoutContent = () => {
 
   return (
     <>
+<<<<<<< HEAD
       <StatusBar 
         barStyle="light-content" 
         backgroundColor={isDark ? '#1a1a2e' : '#6C63FF'} 
         translucent={false}
       />
+=======
+>>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
       <Tabs
         screenOptions={{
           headerTitle: '',
           headerTitleAlign: 'center',
+<<<<<<< HEAD
           headerTransparent: false, // Changed to false
+=======
+          headerTransparent: true,
+>>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
           headerStyle: {
             backgroundColor: isDark ? '#1a1a2e' : '#6C63FF',
             elevation: 0,
             shadowOpacity: 0,
+<<<<<<< HEAD
             height: Platform.OS === 'ios' ? 44 + insets.top : 56, // Proper header height
+=======
+>>>>>>> b6d9ba08d8d697f0992df421ef01d88185eca7ca
           },
           headerLeft: ({ canGoBack }) =>
             canGoBack ? (
@@ -389,6 +403,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  modalIcon: {
+    marginBottom: 15,
   },
   modalIcon: {
     marginBottom: 15,
