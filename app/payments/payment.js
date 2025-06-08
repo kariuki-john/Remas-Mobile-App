@@ -14,14 +14,19 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { LinearGradient } from 'expo-linear-gradient';
 import { apiGet } from '../serviceApi';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 function PaymentPage() {
   const [loading, setLoading] = useState(false);
   const [paymentPurpose, setPaymentPurpose] = useState('RENT');
   const [depositBalance, setDepositBalance] = useState(15000); // Dummy data
-  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
 
   const router = useRouter();
+
+  useEffect(() => {
+    fetchDeposit();
+  }, []);
+
   const {
     unitName, unitId, propertyName, propertyAddress,
     paymentMonthStart, paymentMonthEnd, requiredAmount, amountPaid,
@@ -30,6 +35,18 @@ function PaymentPage() {
   const showToast = (type, text1, text2 = '') => {
     Toast.show({ type, text1, text2, position: 'top', visibilityTime: 4000 });
   };
+
+  const fetchDeposit= async () => {
+    try {
+      const email = await AsyncStorage.getItem('email');
+      const response = await apiGet(`/payment/get-deposit-details?email=${email}&&unitId=${unitId}`);
+      console.log('Deposit response:', response);
+      setDepositBalance(response?.data?.amountRequired-response?.data?.amountPaid || 0);
+    } catch (err) {
+      console.error("Deposit error:", err);
+      showToast('error', 'Deposit error', 'Failed to fetch deposit balance');
+    }
+  }
 
   const handleProceedToPayment = async () => {
     if (!unitId || !paymentPurpose) {

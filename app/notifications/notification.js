@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { apiPost} from '../serviceApi';
+import { apiPost, apiPut} from '../serviceApi';
 import eventEmitter from '../eventEmitter';
 
 const NotificationScreen = () => {
@@ -40,9 +40,9 @@ const NotificationScreen = () => {
   
     try {
      
-      await apiPost(`/bills-notifications/notification/read/${notification.id}`);
+      await apiPut(`/bills-notifications/notification/read/${notification.id}`, {});
      
-  
+      fetchNotifications();
       // Remove the notification from the state (if needed)
   
       // Emit event to update the unread badge
